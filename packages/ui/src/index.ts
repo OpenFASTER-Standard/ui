@@ -1,2 +1,2 @@
-// Public exports. Populated with real components starting Task 2.
-export {}
+export { Button, buttonVariants } from "./components/ui/button"
+export { Badge, badgeVariants } from "./components/ui/badge"

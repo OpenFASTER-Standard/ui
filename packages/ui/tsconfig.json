@@ -12,6 +12,7 @@
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src",
+    "types": ["@testing-library/jest-dom"],
     "paths": {
       "@/*": ["./src/*"]
     }
