@@ -28,6 +28,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # workflow_run's default checkout is the branch tip at trigger
+          # time, not necessarily the exact commit CI just tested -- if
+          # another push landed on main in between, that would publish an
+          # untested commit. Pin explicitly to the commit CI actually ran
+          # against (a no-op for workflow_dispatch, where this context is
+          # empty and checkout already defaults to the triggering ref).
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
