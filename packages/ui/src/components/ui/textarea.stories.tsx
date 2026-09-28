@@ -12,3 +12,11 @@ type Story = StoryObj<typeof Textarea>
 export const Default: Story = {
   args: { placeholder: "Reasoning" },
 }
+
+export const Disabled: Story = {
+  args: { placeholder: "Reasoning", disabled: true },
+}
+
+export const Invalid: Story = {
+  args: { placeholder: "Reasoning", "aria-invalid": true },
+}

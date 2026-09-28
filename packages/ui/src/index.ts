@@ -4,7 +4,7 @@ export { Input } from "./components/ui/input"
 export { Checkbox } from "./components/ui/checkbox"
 export { Label } from "./components/ui/label"
 export { Textarea } from "./components/ui/textarea"
-export { Form, FormItem, FormLabel, FormControl, FormMessage } from "./components/ui/form"
+export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "./components/ui/form"
 export { Alert, AlertTitle, AlertDescription, AlertAction } from "./components/ui/alert"
 export {
   Card,

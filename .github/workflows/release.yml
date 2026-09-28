@@ -1,7 +1,14 @@
 name: Release
 
 on:
-  push:
+  # Gated on CI's own success, not a plain push -- `push: branches: [main]`
+  # on both workflows would fire this independently and concurrently with
+  # ci.yml, with no ordering guarantee that CI finishes (or even that it
+  # passes) before this one starts publishing. workflow_run only fires
+  # after CI has actually concluded, and its conclusion is checked below.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -10,18 +17,28 @@ permissions:
   pull-requests: write
   id-token: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
+          registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openfaster-standard/ui exec tsc --noEmit
       - run: pnpm --filter @openfaster-standard/ui build
+      - run: pnpm --filter @openfaster-standard/ui test
       - uses: changesets/action@v1
         with:
           publish: pnpm --filter @openfaster-standard/ui publish
