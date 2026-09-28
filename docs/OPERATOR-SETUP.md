@@ -4,6 +4,14 @@ Everything else in this repo — build, test, Storybook, CI, versioning —
 is fully automated. These steps need a human (two of them need a real npm
 account with 2FA), and only need to happen once.
 
+**Until step 1 is done, every run of `release.yml` will fail — this is
+expected, not a sign anything is broken.** Confirmed live: it builds
+successfully, correctly detects no `NPM_TOKEN` and attempts OIDC Trusted
+Publishing, gets a real 404 (no Trusted Publisher configured yet — step 2
+below), falls back to a normal publish attempt, and 404s again (the
+package doesn't exist on npm yet — step 1 below). Once steps 1 and 2 are
+done, this same workflow succeeds with no further changes.
+
 ## 1. First publish (manual, interactive, one time only)
 
 npm requires a package to already exist before a Trusted Publisher can be
