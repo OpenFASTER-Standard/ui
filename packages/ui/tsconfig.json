@@ -12,7 +12,7 @@
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["@testing-library/jest-dom"],
+    "types": ["@testing-library/jest-dom/vitest", "node"],
     "paths": {
       "@/*": ["./src/*"]
     }

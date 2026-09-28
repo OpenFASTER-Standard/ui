@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openfaster-standard/ui exec tsc --noEmit
+      - run: pnpm --filter @openfaster-standard/ui test
+      - run: pnpm --filter @openfaster-standard/ui build
+      - run: pnpm --filter @openfaster-standard/ui build-storybook
