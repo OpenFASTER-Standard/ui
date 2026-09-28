@@ -16,6 +16,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @openfaster-standard/ui exec tsc --noEmit
-      - run: pnpm --filter @openfaster-standard/ui test
       - run: pnpm --filter @openfaster-standard/ui build
+      - run: pnpm --filter @openfaster-standard/ui test
       - run: pnpm --filter @openfaster-standard/ui build-storybook
