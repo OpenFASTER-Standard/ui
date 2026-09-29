@@ -33,14 +33,15 @@ account" item):
   enrollment for new accounts. The passkey itself lives in the same
   Vaultwarden org item (`login.fido2Credentials`), not on any individual's
   device — Bitwarden's real browser extension, driven headlessly via
-  Playwright (profile + unpacked extension under
-  `/work/webauthn-relay` on `cloud-admin-box`), acts as the actual FIDO2
-  authenticator for both enrollment and every later assertion. See that
-  directory's own notes for the exact driving pattern (a Chromium
-  extension loaded via `--load-extension`, logged into the self-hosted
-  Vaultwarden server, intercepting real `navigator.credentials`
-  calls) — this is a general capability, reusable for any future
-  service that gates a privileged action behind WebAuthn.
+  Playwright, acts as the actual FIDO2 authenticator for both enrollment
+  and every later assertion. The driver lives in its own repo,
+  [`divizend/misc/webauthn-relay`](git@internal-gitlab.default.svc.cluster.local:divizend/misc/webauthn-relay.git)
+  (cloned to `/work/webauthn-relay` on `cloud-admin-box`) — see its
+  README for the exact driving pattern (a Chromium extension loaded via
+  `--load-extension`, logged into the self-hosted Vaultwarden server,
+  intercepting real `navigator.credentials` calls) — this is a general
+  capability, reusable for any future service that gates a privileged
+  action behind WebAuthn, not specific to npm or this repo.
 - Any npm CLI action that needs live verification (`npm trust`, `npm
   token revoke`, an interactive `npm login`) prints a
   `https://www.npmjs.com/auth/cli/<id>` URL and waits — **run it with a
