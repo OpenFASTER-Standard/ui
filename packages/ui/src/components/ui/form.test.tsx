@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
 import { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "./form"
+import { Input } from "./input"
+import { Label } from "./label"
 
 describe("Form", () => {
-  it("renders a label and a working control, styled like the standalone Input/Label", () => {
+  it("renders a label and a working control, styled identically to the standalone Input/Label", () => {
     render(
       <Form>
         <FormItem>
@@ -15,9 +17,21 @@ describe("Form", () => {
     const control = screen.getByPlaceholderText("Author")
     fireEvent.change(control, { target: { value: "julian" } })
     expect(control).toHaveValue("julian")
-    expect(control.className).toContain("rounded-lg") // Input's own real compiled class
+
+    // Asserts the actual documented claim (form.tsx: "a field built from
+    // Form looks identical to the same input used outside a Form") by
+    // comparing against the real standalone components, rather than
+    // hardcoding one of their classes here -- immune to either
+    // component's own styling changing, which previously broke this test
+    // for a change that broke nothing about Form's own composition.
+    const { container: standaloneContainer } = render(<Input placeholder="standalone" />)
+    const standaloneInput = standaloneContainer.querySelector("input")!
+    expect(control.className).toBe(standaloneInput.className)
+
     const label = screen.getByText("Author")
-    expect(label.className).toContain("leading-none") // Label's own real compiled class
+    const { container: standaloneLabelContainer } = render(<Label>standalone</Label>)
+    const standaloneLabel = standaloneLabelContainer.querySelector("label")!
+    expect(label.className).toBe(standaloneLabel.className)
   })
 
   it("renders a description", () => {
