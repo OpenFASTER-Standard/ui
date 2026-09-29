@@ -28,6 +28,7 @@ export {
   DialogTitle,
   DialogTrigger,
 } from "./components/ui/dialog"
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "./components/ui/accordion"
 export {
   Table,
   TableHeader,
