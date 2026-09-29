@@ -21,6 +21,7 @@ const REPRESENTATIVE_CLASSES = [
   "bg-muted", // Skeleton, Card
   "animate-pulse", // Skeleton
   "border-input", // Input, Checkbox
+  "animate-accordion-down", // Accordion
 ]
 
 describe("dist/ integrity (real built output, not source claims)", () => {
@@ -54,6 +55,22 @@ describe("dist/ integrity (real built output, not source claims)", () => {
     walk(dir)
     return found
   }
+
+  it("emits exactly one 'use client' directive, at the top of each JS entry point", () => {
+    // Previously inlined ad hoc into exactly two source files (dialog.tsx,
+    // label.tsx) -- an inconsistent, arbitrary-looking subset (label.tsx,
+    // the one component with no hooks/state, had it; accordion.tsx,
+    // checkbox.tsx, and form.tsx, all real Base UI stateful primitives,
+    // didn't). Applied once via tsup's own banner instead, to the whole
+    // bundle, so every component gets the same React Server Components
+    // boundary regardless of which one a consumer imports.
+    for (const entry of ["index.js", "index.cjs"]) {
+      const contents = readFileSync(path.join(DIST, entry), "utf-8")
+      const occurrences = contents.match(/use client/g) ?? []
+      expect(occurrences.length, `${entry} should have exactly one 'use client'`).toBe(1)
+      expect(contents.trimStart().startsWith('"use client"'), `${entry} should start with "use client"`).toBe(true)
+    }
+  })
 
   it("emits no *.stories.d.ts (Storybook types are a devDependency, not part of the public package)", () => {
     const found = listFiles(DIST).filter((f) => f.endsWith(".stories.d.ts"))
@@ -96,6 +113,7 @@ describe("dist/ integrity (real built output, not source claims)", () => {
         `  Skeleton,`,
         `  Dialog, DialogTrigger, DialogContent, DialogTitle,`,
         `  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,`,
+        `  Accordion, AccordionItem, AccordionTrigger, AccordionContent,`,
         `} from ${JSON.stringify(path.join(DIST, "index.js"))}`,
         ``,
         `function Consumer() {`,
@@ -120,6 +138,7 @@ describe("dist/ integrity (real built output, not source claims)", () => {
         `      <Skeleton />`,
         `      <Dialog><DialogTrigger>x</DialogTrigger><DialogContent><DialogTitle>x</DialogTitle></DialogContent></Dialog>`,
         `      <Table><TableHeader><TableRow><TableHead>x</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell>x</TableCell></TableRow></TableBody></Table>`,
+        `      <Accordion><AccordionItem value="a"><AccordionTrigger>x</AccordionTrigger><AccordionContent>x</AccordionContent></AccordionItem></Accordion>`,
         `    </div>`,
         `  )`,
         `}`,
