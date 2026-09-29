@@ -17,6 +17,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openfaster-standard/ui lint
       - run: pnpm --filter @openfaster-standard/ui exec tsc --noEmit
       - run: pnpm --filter @openfaster-standard/ui build
       - run: pnpm --filter @openfaster-standard/ui test

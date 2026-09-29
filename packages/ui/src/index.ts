@@ -1,3 +1,4 @@
+export { cn } from "./lib/utils"
 export { Button, buttonVariants } from "./components/ui/button"
 export { Badge, badgeVariants } from "./components/ui/badge"
 export { Input } from "./components/ui/input"
@@ -14,6 +15,7 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  cardVariants,
 } from "./components/ui/card"
 export { Skeleton } from "./components/ui/skeleton"
 export {

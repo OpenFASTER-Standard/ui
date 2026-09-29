@@ -3,14 +3,17 @@ import { writeFileSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
+import * as src from "./index"
 
 const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..")
-const EXPECTED_NAMES = [
-  "Button", "Badge", "Input", "Checkbox", "Label", "Textarea",
-  "Form", "Alert", "Card", "Skeleton", "Dialog", "Table",
-]
+// Derived from the real source's own re-exports, not a hand-maintained
+// list -- a list like that drifted silently before: Accordion was added
+// to src/index.ts without ever being added here, and the two tests meant
+// to catch exactly that ("a component exists but isn't really shipped")
+// both missed it because neither derived its expectation from reality.
+const EXPECTED_NAMES = Object.keys(src)
 
-describe("all 12 components are real public exports of the built package", () => {
+describe(`all ${EXPECTED_NAMES.length} real exports of src/index.ts are real public exports of the built package`, () => {
   it("every expected name resolves via ESM import from dist/index.js", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "ui-all-exports-"))
     const script = path.join(dir, "check.mjs")
