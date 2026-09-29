@@ -1,79 +1,42 @@
-# Operator setup: the steps this repo's automation cannot do itself
+# npm publishing automation
 
-Everything else in this repo — build, test, Storybook, CI, versioning —
-is fully automated. These steps need a human (two of them need a real npm
-account with 2FA), and only need to happen once.
+This repo publishes to npm and deploys its Storybook catalogue with no
+manual steps left for a human operator. This file used to be a setup
+checklist; it's now a record of how that automation works, for whoever
+next needs to touch it.
 
-**Until step 1 is done, every run of `release.yml` will fail — this is
-expected, not a sign anything is broken.** Confirmed live: it builds
-successfully, correctly detects no `NPM_TOKEN` and attempts OIDC Trusted
-Publishing, gets a real 404 (no Trusted Publisher configured yet — step 2
-below), falls back to a normal publish attempt, and 404s again (the
-package doesn't exist on npm yet — step 1 below). Once steps 1 and 2 are
-done, this same workflow succeeds with no further changes.
+## How it works
 
-## 1. First publish (manual, interactive, one time only)
+`@openfaster-standard/ui` is published by a dedicated npm account,
+`openfaster-standard-bot`, that `cloud-admin-box` controls (not a human's
+personal npm account). Credentials live in Vaultwarden's Divizend org
+("cloud-admin-box: npm openfaster-standard-bot account" item), including
+why they're shaped the way they are:
 
-npm requires a package to already exist before a Trusted Publisher can be
-configured for it — so the very first version has to go up the classic
-way. **Build and verify before publishing** — `npm publish` on a fresh
-clone with no build run would otherwise ship an empty package (`dist/` is
-gitignored, and there's nothing to stop a clean checkout from having none
-of it yet):
+- npm removed TOTP 2FA enrollment for new accounts (WebAuthn/security-key
+  only now), so this account can't hold a standing TOTP secret the way
+  other box-controlled accounts do. 2FA is left off; privileged actions
+  challenge a one-time email OTP instead, which the box can read and
+  relay itself via `openfaster@divizend.com` (a Google Group, readable
+  through `scratch listGmailMessagesDetailed`).
+- `release.yml` publishes using a **granular access token** (scope
+  `@openfaster-standard`, read-write, `--bypass-2fa`), stored as the
+  `NPM_TOKEN` GitHub Actions secret on this repo. `changesets/action`
+  uses `NPM_TOKEN` directly when present, no OIDC involved.
+- **This token expires 90 days after creation** (npm's cap for
+  read-write granular tokens) and must be rotated before then via
+  `npm token create ... --bypass-2fa --expires 90`, updating both the
+  GitHub secret (`gh secret set NPM_TOKEN --repo OpenFASTER-Standard/ui`)
+  and the Vaultwarden item.
+- Trusted Publishing (OIDC) was the original design but turned out to
+  require genuine WebAuthn 2FA on the publishing account for the
+  `npm trust` configuration step specifically — bypass-2FA tokens are
+  explicitly rejected for that one action. Building a software WebAuthn
+  authenticator to clear that bar was judged out of scope; the token+secret
+  approach above achieves the same automated outcome without it.
 
-```bash
-git clone https://github.com/OpenFASTER-Standard/ui.git
-cd ui
-pnpm install
-cd packages/ui
-pnpm build
+## GitHub Pages
 
-# Confirm the tarball actually contains dist/, README.md, and LICENSE
-# before publishing -- this is the one irreversible step in the whole
-# project (npm does not allow republishing a version number).
-npm pack --dry-run
-
-npm login   # as sigalor, with 2FA
-npm publish --access public
-```
-
-(`prepublishOnly` already runs `pnpm build` automatically as a second
-safety net, but running it explicitly first lets you inspect the tarball
-with `npm pack --dry-run` before the irreversible step.)
-
-Expected: `@openfaster-standard/ui@0.1.0` (or whatever version
-`package.json` currently has) appears at
-https://www.npmjs.com/package/@openfaster-standard/ui, with `dist/`,
-`README.md`, and `LICENSE` all present in its "Files" tab.
-
-## 2. Configure npm Trusted Publishing (one time only)
-
-1. Go to https://www.npmjs.com/package/@openfaster-standard/ui/access
-2. Under "Trusted Publisher", add a new GitHub Actions publisher:
-   - Organization/user: `OpenFASTER-Standard`
-   - Repository: `ui`
-   - Workflow filename: `release.yml`
-   - Environment: (leave blank unless one is later added to `release.yml`)
-3. Save.
-
-From this point on, `.github/workflows/release.yml` can publish new
-versions on its own via OIDC — no `NPM_TOKEN` secret, nothing to rotate.
-Every subsequent release goes through a normal Changesets PR merge, not
-a manual step. Note `release.yml` only runs after `ci.yml` completes
-successfully on `main` (it's triggered by CI's own `workflow_run`
-completion, not directly by the push) — a merge that breaks tests never
-reaches the publish step.
-
-## 3. Enable GitHub Pages (one time only)
-
-`.github/workflows/storybook.yml` deploys the Storybook catalogue to
-GitHub Pages on every push to `main`, but GitHub Pages itself needs to be
-switched on first:
-
-1. Go to https://github.com/OpenFASTER-Standard/ui/settings/pages
-2. Under "Build and deployment" → "Source", select **GitHub Actions**
-   (not "Deploy from a branch").
-
-Once enabled, the deployed catalogue appears at
-https://openfaster-standard.github.io/ui/ after the next successful run
-of `storybook.yml`.
+Already enabled (`gh api repos/OpenFASTER-Standard/ui/pages -X POST -f
+"build_type=workflow"`) — `storybook.yml` deploys to
+https://openfaster-standard.github.io/ui/ on every push to `main`.
