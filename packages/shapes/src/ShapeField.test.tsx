@@ -34,15 +34,13 @@ describe("ShapeField", () => {
   it("renders the real label and hash for a TextFieldEditor shape", () => {
     const graph = parseShapeGraph(TEXT_FIELD_SHAPE)
     render(<ShapeField propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/AOrdNr" graph={graph} />)
-    expect(screen.getByText("AOrdNr")).toBeInTheDocument()
-    expect(screen.getByDisplayValue("sha256:abc123")).toBeInTheDocument()
+    expect(screen.getByLabelText("AOrdNr")).toHaveValue("sha256:abc123")
   })
 
   it("falls back to the IRI's local segment when sh:name is absent", () => {
     const graph = parseShapeGraph(NO_HINTS_SHAPE)
     render(<ShapeField propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/Bare" graph={graph} />)
-    expect(screen.getByText("Bare")).toBeInTheDocument()
-    expect(screen.getByDisplayValue("sha256:def456")).toBeInTheDocument()
+    expect(screen.getByLabelText("Bare")).toHaveValue("sha256:def456")
   })
 
   it("degrades to the plain fallback for an unrecognized dash:editor, without throwing", () => {
@@ -50,7 +48,6 @@ describe("ShapeField", () => {
     expect(() =>
       render(<ShapeField propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/Dated" graph={graph} />),
     ).not.toThrow()
-    expect(screen.getByText("Dated")).toBeInTheDocument()
-    expect(screen.getByDisplayValue("sha256:ghi789")).toBeInTheDocument()
+    expect(screen.getByLabelText("Dated")).toHaveValue("sha256:ghi789")
   })
 })

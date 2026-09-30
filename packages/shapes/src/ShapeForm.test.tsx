@@ -23,3 +23,12 @@ describe("ShapeForm", () => {
     expect(labels).toEqual(["First", "Second"])
   })
 })
+
+describe("ShapeForm spacing", () => {
+  it("renders its fields with real spacing between them, not an unstyled wrapper", () => {
+    const graph = parseShapeGraph(TWO_PROPERTY_SHAPE)
+    const { container } = render(<ShapeForm nodeShapeIri="https://openfaster.org/ns/generator#S/Sh" graph={graph} />)
+    const wrapper = container.firstElementChild as HTMLElement
+    expect(wrapper.className).toMatch(/gap-/)
+  })
+})

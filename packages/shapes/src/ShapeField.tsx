@@ -1,4 +1,4 @@
-import { Input, Label } from "@openfaster-standard/ui"
+import { FormControl, FormItem, FormLabel } from "@openfaster-standard/ui"
 import { DataFactory } from "n3"
 import { DASH_NS, getPropertyShapeInfo, type ShapeGraph } from "./parse"
 
@@ -22,9 +22,9 @@ export function ShapeField({ propertyShapeIri, graph }: { propertyShapeIri: stri
   const displayValue = hash ?? "no value"
 
   return (
-    <div>
-      <Label>{name}</Label>
-      <Input readOnly value={displayValue} />
-    </div>
+    <FormItem>
+      <FormLabel>{name}</FormLabel>
+      <FormControl readOnly value={displayValue} />
+    </FormItem>
   )
 }
