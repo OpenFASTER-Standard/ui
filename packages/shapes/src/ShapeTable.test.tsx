@@ -132,3 +132,150 @@ ${citedProperty("https://openfaster.org/ns/generator#S/Sh/p2", "same", "Bbb")}
     expect(screen.getByText(/Value from Bbb\./)).toBeInTheDocument()
   })
 })
+
+describe("ShapeTable error handling and staleness (final review Critical#2/Important#1/#2)", () => {
+  it("shows the real value for a working cell even when a different cell's resolution rejects (Critical#2)", async () => {
+    // One malformed graph makes resolveCitedValue itself throw for that
+    // one property -- must not take the whole table's Promise.all down
+    // with it.
+    vi.resetModules()
+    vi.doMock("./resolve", async () => {
+      const actual = await vi.importActual<typeof import("./resolve")>("./resolve")
+      let call = 0
+      return {
+        ...actual,
+        resolveCitedValue: vi.fn().mockImplementation((...args: Parameters<typeof actual.resolveCitedValue>) => {
+          call += 1
+          return call === 1 ? Promise.reject(new Error("unexpected")) : actual.resolveCitedValue(...args)
+        }),
+      }
+    })
+    const { ShapeTable: PatchedShapeTable } = await import("./ShapeTable")
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(TWO_TYPES_FIXTURE_XML) }))
+    const graph = parseShapeGraph(
+      PREFIXES +
+        `
+<https://openfaster.org/ns/generator#S/ShapeA> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/ShapeA/value> .
+${citedProperty("https://openfaster.org/ns/generator#S/ShapeA/value", "value", "Aaa")}
+<https://openfaster.org/ns/generator#S/ShapeB> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/ShapeB/value> .
+${citedProperty("https://openfaster.org/ns/generator#S/ShapeB/value", "value", "Bbb")}
+`,
+    )
+
+    render(
+      <PatchedShapeTable
+        nodeShapeIris={["https://openfaster.org/ns/generator#S/ShapeA", "https://openfaster.org/ns/generator#S/ShapeB"]}
+        graph={graph}
+        resolveSourceUri={(u) => u}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByText("Value from Bbb.")).toBeInTheDocument())
+    vi.doUnmock("./resolve")
+    vi.resetModules()
+  })
+
+  it("shows Resolving… rather than a stale value while re-resolving after the graph changes (Important#1)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(TWO_TYPES_FIXTURE_XML) })
+    vi.stubGlobal("fetch", fetchMock)
+    const graphA = parseShapeGraph(
+      PREFIXES +
+        `
+<https://openfaster.org/ns/generator#S/ShapeA> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/ShapeA/value> .
+${citedProperty("https://openfaster.org/ns/generator#S/ShapeA/value", "value", "Aaa")}
+`,
+    )
+
+    const { rerender } = render(
+      <ShapeTable nodeShapeIris={["https://openfaster.org/ns/generator#S/ShapeA"]} graph={graphA} resolveSourceUri={(u) => u} />,
+    )
+    await waitFor(() => expect(screen.getByText("Value from Aaa.")).toBeInTheDocument())
+
+    // A new graph, same property IRI, citing a DIFFERENT element -- the
+    // second fetch is deliberately left unresolved so the intermediate
+    // state is observable.
+    fetchMock.mockImplementation(() => new Promise(() => {}))
+    const graphB = parseShapeGraph(
+      PREFIXES +
+        `
+<https://openfaster.org/ns/generator#S/ShapeA> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/ShapeA/value> .
+${citedProperty("https://openfaster.org/ns/generator#S/ShapeA/value", "value", "Bbb")}
+`,
+    )
+    rerender(<ShapeTable nodeShapeIris={["https://openfaster.org/ns/generator#S/ShapeA"]} graph={graphB} resolveSourceUri={(u) => u} />)
+
+    expect(screen.getByText("Resolving…")).toBeInTheDocument()
+  })
+
+  it("does not re-fetch when resolveSourceUri's identity changes but its behavior doesn't (Important#2)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(TWO_TYPES_FIXTURE_XML) })
+    vi.stubGlobal("fetch", fetchMock)
+    const graph = parseShapeGraph(
+      PREFIXES +
+        `
+<https://openfaster.org/ns/generator#S/ShapeA> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/ShapeA/value> .
+${citedProperty("https://openfaster.org/ns/generator#S/ShapeA/value", "value", "Aaa")}
+`,
+    )
+    // A stable nodeShapeIris reference across both renders -- this test
+    // isolates resolveSourceUri's own identity specifically; nodeShapeIris
+    // getting a fresh array literal on every render is a separate,
+    // already-expected cause of re-resolution (rows depends on it
+    // directly), not what this test is about.
+    const stableNodeShapeIris = ["https://openfaster.org/ns/generator#S/ShapeA"]
+
+    const { rerender } = render(
+      <ShapeTable nodeShapeIris={stableNodeShapeIris} graph={graph} resolveSourceUri={(u) => u} />,
+    )
+    await waitFor(() => expect(screen.getByText("Value from Aaa.")).toBeInTheDocument())
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    rerender(<ShapeTable nodeShapeIris={stableNodeShapeIris} graph={graph} resolveSourceUri={(u) => u} />)
+
+    expect(screen.getByText("Value from Aaa.")).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not collide two different nodeShapeIris arrays whose elements happen to contain commas (Minor#2)", async () => {
+    // A real IRI containing a literal "," is legal -- the pre-fix
+    // implementation joined nodeShapeIris with "," to build a dependency
+    // key, so ["a,b"] (one node shape) and ["a", "b"] (two) produced the
+    // identical key and could be mistaken for the same render input.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(TWO_TYPES_FIXTURE_XML) }))
+    const graph = parseShapeGraph(
+      PREFIXES +
+        `
+<https://openfaster.org/ns/generator#S/ShapeA> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/ShapeA/value> .
+${citedProperty("https://openfaster.org/ns/generator#S/ShapeA/value", "value", "Aaa")}
+<https://openfaster.org/ns/generator#S/ShapeB> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/ShapeB/value> .
+${citedProperty("https://openfaster.org/ns/generator#S/ShapeB/value", "value", "Bbb")}
+`,
+    )
+
+    const { rerender } = render(
+      <ShapeTable nodeShapeIris={["https://openfaster.org/ns/generator#S/ShapeA"]} graph={graph} resolveSourceUri={(u) => u} />,
+    )
+    await waitFor(() => expect(screen.getByText("Value from Aaa.")).toBeInTheDocument())
+    expect(screen.queryByText("Value from Bbb.")).not.toBeInTheDocument()
+
+    rerender(
+      <ShapeTable
+        nodeShapeIris={[
+          "https://openfaster.org/ns/generator#S/ShapeA",
+          "https://openfaster.org/ns/generator#S/ShapeB",
+        ]}
+        graph={graph}
+        resolveSourceUri={(u) => u}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByText("Value from Bbb.")).toBeInTheDocument())
+  })
+})

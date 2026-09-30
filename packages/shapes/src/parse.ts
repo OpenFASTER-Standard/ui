@@ -15,6 +15,7 @@ export const GEN_NS = "https://openfaster.org/ns/generator#"
 export const DASH_NS = "http://datashapes.org/dash#"
 export const PROV_NS = "http://www.w3.org/ns/prov#"
 export const OA_NS = "http://www.w3.org/ns/oa#"
+export const RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 
 // sh:property [ ... ] (an anonymous property shape) is the canonical
 // SHACL authoring form -- this package's own IDs are plain strings

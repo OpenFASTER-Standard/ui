@@ -12,5 +12,6 @@ describe("package public surface", () => {
     expect(shapes.DASH_NS).toBe("http://datashapes.org/dash#")
     expect(shapes.PROV_NS).toBe("http://www.w3.org/ns/prov#")
     expect(shapes.OA_NS).toBe("http://www.w3.org/ns/oa#")
+    expect(shapes.RDF_NS).toBe("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
   })
 })

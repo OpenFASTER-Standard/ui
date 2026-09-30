@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { parseShapeGraph } from "./parse"
-import { resolveCitedValue } from "./resolve"
+import { displayTextFor, resolveCitedValue } from "./resolve"
 
 const REAL_DOCUMENTATION_TEXT = "Meldung nach § 45c Absatz 2 Satz 3 EStG."
 
@@ -170,5 +170,100 @@ _:selector a oa:XPathSelector ;
     const result = await resolveCitedValue(graph, "https://openfaster.org/ns/generator#S/Sh/Doc", (u) => u)
 
     expect(result).toEqual({ status: "uncitable" })
+  })
+
+  // Final-review Critical#1: a resolved, ok fetch can still fail while
+  // reading its body (an aborted connection, a decode error) -- verified
+  // live this is a real, reachable failure mode, not contrived. The
+  // spec's own contract is that resolveCitedValue never throws.
+  it("returns fetch-failed if reading the response body fails, without throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.reject(new Error("body stream aborted")) }),
+    )
+    const graph = shapeGraphWithCitation("/xs:schema")
+
+    const result = await resolveCitedValue(graph, "https://openfaster.org/ns/generator#S/Sh/Doc", (u) => u)
+
+    expect(result).toEqual({ status: "fetch-failed" })
+  })
+
+  // Final-review Minor#8: verified live that jsdom's DOMParser produces a
+  // real <parsererror> root for genuinely malformed (not just
+  // well-formed-but-wrong) content -- e.g. a proxy's plain-text error
+  // page -- and this must be distinguished from a real XML document that
+  // simply doesn't contain the cited element (which stays "not-found").
+  it("returns fetch-failed for a response body that isn't XML at all (a real <parsererror>)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve("Not valid XML at all <<<") }))
+    const graph = shapeGraphWithCitation("/xs:schema")
+
+    const result = await resolveCitedValue(graph, "https://openfaster.org/ns/generator#S/Sh/Doc", (u) => u)
+
+    expect(result).toEqual({ status: "fetch-failed" })
+  })
+
+  // Final-review Minor#7: the spec explicitly sanctions collapsing a
+  // missing oa:hasSource into fetch-failed, but a selector with no
+  // rdf:type at all, or no rdf:value at all, is a genuinely different,
+  // narrower case the spec never considered -- a real citation that is
+  // simply incomplete, not one pointing at an unsupported-but-real
+  // selector kind, and not indistinguishable from a network failure.
+  it("returns malformed-citation for a selector with no rdf:type at all", async () => {
+    const graph = parseShapeGraph(`
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<https://openfaster.org/ns/generator#S/Sh/NoType> a sh:PropertyShape ;
+  prov:wasDerivedFrom <https://openfaster.org/ns/generator#S/Sh/NoType/annotation> .
+<https://openfaster.org/ns/generator#S/Sh/NoType/annotation> oa:hasTarget _:target .
+_:target oa:hasSource <file:///work/ontologies/mikadiv-fm/sources/1.02/xsd/MiKaDiv_FM_Meldeart23_1.02.xsd> ;
+  oa:hasSelector _:selector .
+_:selector rdf:value "/xs:schema" .
+`)
+
+    const result = await resolveCitedValue(graph, "https://openfaster.org/ns/generator#S/Sh/NoType", (u) => u)
+
+    expect(result).toEqual({ status: "malformed-citation" })
+  })
+
+  it("returns malformed-citation for an XPathSelector with no rdf:value at all", async () => {
+    const graph = parseShapeGraph(`
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+<https://openfaster.org/ns/generator#S/Sh/NoValue> a sh:PropertyShape ;
+  prov:wasDerivedFrom <https://openfaster.org/ns/generator#S/Sh/NoValue/annotation> .
+<https://openfaster.org/ns/generator#S/Sh/NoValue/annotation> oa:hasTarget _:target .
+_:target oa:hasSource <file:///work/ontologies/mikadiv-fm/sources/1.02/xsd/MiKaDiv_FM_Meldeart23_1.02.xsd> ;
+  oa:hasSelector _:selector .
+_:selector a oa:XPathSelector .
+`)
+
+    const result = await resolveCitedValue(graph, "https://openfaster.org/ns/generator#S/Sh/NoValue", (u) => u)
+
+    expect(result).toEqual({ status: "malformed-citation" })
+  })
+})
+
+// Final review Important#5: RESOLVED_VALUE_STATUS_TEXT/displayTextFor had
+// no direct test at all -- a typo in any of these user-facing strings
+// would have shipped green.
+describe("displayTextFor", () => {
+  it.each([
+    ["unsupported-selector-type", "(not yet supported for display)"],
+    ["malformed-citation", "This citation is incomplete"],
+    ["fetch-failed", "Couldn't load source"],
+    ["not-found", "Not found in source"],
+    ["ambiguous", "Ambiguous citation"],
+    ["uncitable", "Not a citable value"],
+  ] as const)("renders %s as %j", (status, expectedText) => {
+    expect(displayTextFor({ status })).toBe(expectedText)
+  })
+
+  it("renders a resolved value as its own real text, not a status string", () => {
+    expect(displayTextFor({ status: "resolved", value: "Meldung nach § 45c Absatz 2 Satz 3 EStG." })).toBe(
+      "Meldung nach § 45c Absatz 2 Satz 3 EStG.",
+    )
   })
 })

@@ -84,7 +84,7 @@ use).
   resolveSourceUri: (fileUri: string) => string): Promise<ResolvedValue>`.
   Task 2 consumes both.
 
-- [ ] **Step 1: Write the failing test for a real, resolved XPath citation**
+- [x] **Step 1: Write the failing test for a real, resolved XPath citation**
 
 ```typescript
 // packages/shapes/src/resolve.test.ts
@@ -151,13 +151,13 @@ describe("resolveCitedValue", () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: FAIL (`Cannot find module './resolve'` or similar — the file
 doesn't exist yet).
 
-- [ ] **Step 3: Implement `resolveCitedValue` in `packages/shapes/src/resolve.ts`**
+- [x] **Step 3: Implement `resolveCitedValue` in `packages/shapes/src/resolve.ts`**
 
 ```typescript
 import { DataFactory } from "n3"
@@ -206,12 +206,12 @@ export async function resolveCitedValue(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 5: Write the failing test for zero matches**
+- [x] **Step 5: Write the failing test for zero matches**
 
 ```typescript
 it("returns not-found for an XPath with zero matches", async () => {
@@ -224,12 +224,12 @@ it("returns not-found for an XPath with zero matches", async () => {
 })
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [x] **Step 6: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 7: Write the failing test for more than one match**
+- [x] **Step 7: Write the failing test for more than one match**
 
 ```typescript
 it("returns ambiguous for an XPath matching more than one element", async () => {
@@ -247,12 +247,12 @@ it("returns ambiguous for an XPath matching more than one element", async () => 
 })
 ```
 
-- [ ] **Step 8: Run test to verify it passes**
+- [x] **Step 8: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 9: Write the failing test for the attribute-node uncitable case**
+- [x] **Step 9: Write the failing test for the attribute-node uncitable case**
 
 ```typescript
 it("returns uncitable for an attribute-returning XPath (verified live: no throw, wrong nodeType)", async () => {
@@ -266,12 +266,12 @@ it("returns uncitable for an attribute-returning XPath (verified live: no throw,
 })
 ```
 
-- [ ] **Step 10: Run test to verify it passes**
+- [x] **Step 10: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 11: Write the failing test for the string()-typed uncitable case**
+- [x] **Step 11: Write the failing test for the string()-typed uncitable case**
 
 ```typescript
 it("returns uncitable for a string()-typed XPath (verified live: synchronous TypeError)", async () => {
@@ -284,12 +284,12 @@ it("returns uncitable for a string()-typed XPath (verified live: synchronous Typ
 })
 ```
 
-- [ ] **Step 12: Run test to verify it passes**
+- [x] **Step 12: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 13: Write the failing tests for both fetch-failure shapes**
+- [x] **Step 13: Write the failing tests for both fetch-failure shapes**
 
 ```typescript
 it("returns fetch-failed when fetch rejects", async () => {
@@ -311,12 +311,12 @@ it("returns fetch-failed when fetch resolves with a non-ok status", async () => 
 })
 ```
 
-- [ ] **Step 14: Run test to verify it passes**
+- [x] **Step 14: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 15: Write the failing test for an unsupported selector type, with no fetch attempted**
+- [x] **Step 15: Write the failing test for an unsupported selector type, with no fetch attempted**
 
 ```typescript
 it("returns unsupported-selector-type for an SvgSelector, without ever calling fetch", async () => {
@@ -331,12 +331,12 @@ it("returns unsupported-selector-type for an SvgSelector, without ever calling f
 })
 ```
 
-- [ ] **Step 16: Run test to verify it passes**
+- [x] **Step 16: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 17: Write the failing test proving `resolveSourceUri` receives the exact stored `file://` URI**
+- [x] **Step 17: Write the failing test proving `resolveSourceUri` receives the exact stored `file://` URI**
 
 ```typescript
 it("passes the exact stored file:// URI to resolveSourceUri, unmodified", async () => {
@@ -354,12 +354,12 @@ it("passes the exact stored file:// URI to resolveSourceUri, unmodified", async 
 })
 ```
 
-- [ ] **Step 18: Run test to verify it passes**
+- [x] **Step 18: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS
 
-- [ ] **Step 19: Write the failing test for a citation missing `oa:hasSource` entirely**
+- [x] **Step 19: Write the failing test for a citation missing `oa:hasSource` entirely**
 
 ```typescript
 it("returns fetch-failed for a citation with no oa:hasSource at all (malformed graph)", async () => {
@@ -382,14 +382,14 @@ _:selector a oa:XPathSelector ;
 })
 ```
 
-- [ ] **Step 20: Run test to verify it passes**
+- [x] **Step 20: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS (if it fails instead, the implementation's triple-walk
 needs its own missing-link guard to return early rather than crash —
 fix the implementation, not the test)
 
-- [ ] **Step 21: Write the failing test for a syntactically invalid XPath**
+- [x] **Step 21: Write the failing test for a syntactically invalid XPath**
 
 ```typescript
 it("returns uncitable for a syntactically invalid XPath, not a crash", async () => {
@@ -402,7 +402,7 @@ it("returns uncitable for a syntactically invalid XPath, not a crash", async () 
 })
 ```
 
-- [ ] **Step 22: Run test to verify it passes**
+- [x] **Step 22: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS (confirm the same `try`/`catch` around `document.evaluate`
@@ -410,12 +410,12 @@ already added in Step 3 also catches a `DOMException` for invalid syntax,
 not only the `TypeError` for a wrong result type — if it doesn't, widen
 the `catch` to a bare `catch (e)`, not a type-specific one)
 
-- [ ] **Step 23: Run all of Task 1's tests together**
+- [x] **Step 23: Run all of Task 1's tests together**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- resolve`
 Expected: PASS (12 passed)
 
-- [ ] **Step 24: Commit**
+- [x] **Step 24: Commit**
 
 ```bash
 git add packages/shapes/src/resolve.ts packages/shapes/src/resolve.test.ts
@@ -436,7 +436,7 @@ git commit -m "feat(shapes): resolve a citation's real value client-side, mirror
   `{ propertyShapeIri: string; graph: ShapeGraph; resolveSourceUri: (fileUri: string) => string }`.
   Task 3 threads this same prop through `ShapeForm`/`ShapeTable`.
 
-- [ ] **Step 1: Read the current `ShapeField.test.tsx` in full**
+- [x] **Step 1: Read the current `ShapeField.test.tsx` in full**
 
 No code change — confirm the exact current fixture shapes
 (`TEXT_FIELD_SHAPE`/`NO_HINTS_SHAPE`/`UNRECOGNIZED_EDITOR_SHAPE`) and
@@ -444,7 +444,7 @@ their current `toHaveValue("sha256:...")` assertions before rewriting
 them, so the rewrite is a deliberate replacement, not a guess at what
 was there.
 
-- [ ] **Step 2: Rewrite the failing test for the real-value case**
+- [x] **Step 2: Rewrite the failing test for the real-value case**
 
 Replace `TEXT_FIELD_SHAPE` and its test with a fixture carrying a real
 citation (reuse Task 1's `shapeGraphWithCitation` pattern, or import it if
@@ -499,7 +499,7 @@ describe("ShapeField", () => {
 })
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeField`
 Expected: FAIL (`resolveSourceUri` prop not recognized as a TypeScript
@@ -507,7 +507,7 @@ prop yet / `ShapeField` still renders the old hash-based value — either
 a type error or a failed `toHaveValue` assertion, depending on how
 strictly the test runner enforces prop types).
 
-- [ ] **Step 4: Implement the new `ShapeField` in `packages/shapes/src/ShapeField.tsx`**
+- [x] **Step 4: Implement the new `ShapeField` in `packages/shapes/src/ShapeField.tsx`**
 
 ```typescript
 import { useEffect, useState } from "react"
@@ -557,12 +557,12 @@ export function ShapeField({
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeField`
 Expected: PASS
 
-- [ ] **Step 6: Rewrite the remaining two pre-existing tests against real fixtures**
+- [x] **Step 6: Rewrite the remaining two pre-existing tests against real fixtures**
 
 Replace the `NO_HINTS_SHAPE` test (falls back to the IRI's local segment
 for the label — unrelated to value display, keep this assertion, just
@@ -572,12 +572,12 @@ test (degrades gracefully for an unrecognized `dash:editor` — same
 treatment). Both need `waitFor` around the final value assertion, exactly
 like Step 2's test, since resolution is now asynchronous.
 
-- [ ] **Step 7: Run test to verify it passes**
+- [x] **Step 7: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeField`
 Expected: PASS
 
-- [ ] **Step 8: Write the failing test for the unmount-during-fetch case**
+- [x] **Step 8: Write the failing test for the unmount-during-fetch case**
 
 ```typescript
 it("does not warn about setting state after unmount if the fetch resolves after unmount", async () => {
@@ -605,19 +605,19 @@ it("does not warn about setting state after unmount if the fetch resolves after 
 })
 ```
 
-- [ ] **Step 9: Run test to verify it passes**
+- [x] **Step 9: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeField`
 Expected: PASS (Step 4's `cancelled` flag already guards this; run to
 confirm rather than assume — if it fails, the guard is missing or placed
 wrong, fix the implementation)
 
-- [ ] **Step 10: Run all of Task 2's tests together**
+- [x] **Step 10: Run all of Task 2's tests together**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeField`
 Expected: PASS (5 passed)
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add packages/shapes/src/ShapeField.tsx packages/shapes/src/ShapeField.test.tsx
@@ -642,7 +642,7 @@ git commit -m "feat(shapes): ShapeField resolves and displays the real cited val
   `ShapeTable({ nodeShapeIris, graph, resolveSourceUri })` — the public
   surface a future consuming application (a later roadmap task) uses.
 
-- [ ] **Step 1: Write the failing test for `ShapeForm` threading the prop through**
+- [x] **Step 1: Write the failing test for `ShapeForm` threading the prop through**
 
 ```typescript
 // packages/shapes/src/ShapeForm.test.tsx -- add to the existing file
@@ -662,13 +662,13 @@ it("threads resolveSourceUri through to every rendered ShapeField", async () => 
 Read the existing `ShapeForm.test.tsx` first to match its current fixture
 style exactly rather than inventing a new one.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeForm`
 Expected: FAIL (`resolveSourceUri` prop not passed through to `ShapeField`
 yet — `resolveSourceUri` mock never called).
 
-- [ ] **Step 3: Implement the updated `ShapeForm`**
+- [x] **Step 3: Implement the updated `ShapeForm`**
 
 ```typescript
 export function ShapeForm({
@@ -691,12 +691,12 @@ export function ShapeForm({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeForm`
 Expected: PASS
 
-- [ ] **Step 5: Read the current `ShapeTable.tsx` and `ShapeTable.test.tsx` in full**
+- [x] **Step 5: Read the current `ShapeTable.tsx` and `ShapeTable.test.tsx` in full**
 
 No code change — `ShapeTable` today calls `getPropertyShapeInfo` directly
 and renders `.hash`, never going through `ShapeField` at all. Confirm its
@@ -704,7 +704,7 @@ real current column/row/multi-match-join behavior (the "two property
 shapes sharing one `sh:name` render as a comma-joined single cell" case)
 before changing anything, so the rewrite preserves it deliberately.
 
-- [ ] **Step 6: Write the failing test for `ShapeTable` showing real resolved values**
+- [x] **Step 6: Write the failing test for `ShapeTable` showing real resolved values**
 
 ```typescript
 it("resolves and displays real cited values in table cells, preserving the comma-join for shared names", async () => {
@@ -718,12 +718,12 @@ it("resolves and displays real cited values in table cells, preserving the comma
 })
 ```
 
-- [ ] **Step 7: Run test to verify it fails**
+- [x] **Step 7: Run test to verify it fails**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeTable`
 Expected: FAIL (`ShapeTable` still renders `.hash`, not a resolved value).
 
-- [ ] **Step 8: Implement the updated `ShapeTable`, resolving values via `resolveCitedValue` directly (not by rendering `<ShapeField>` per cell)**
+- [x] **Step 8: Implement the updated `ShapeTable`, resolving values via `resolveCitedValue` directly (not by rendering `<ShapeField>` per cell)**
 
 `ShapeTable`'s own real constraint — one cell can hold multiple
 comma-joined values from different property shapes sharing one `sh:name`
@@ -739,18 +739,18 @@ isn't already there, so both components share one copy) for `.hash ??
 component the same shape as `ShapeField` (a `useEffect`/`useState` pair
 resolving all cells' values on mount).
 
-- [ ] **Step 9: Run test to verify it passes**
+- [x] **Step 9: Run test to verify it passes**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeTable`
 Expected: PASS
 
-- [ ] **Step 10: Run every pre-existing `ShapeTable` test to confirm nothing regressed**
+- [x] **Step 10: Run every pre-existing `ShapeTable` test to confirm nothing regressed**
 
 Run: `pnpm --filter @openfaster-standard/shapes test -- ShapeTable`
 Expected: PASS (every pre-existing test, updated per Step 5's reading,
 still passes with real citations substituted for bare hashes)
 
-- [ ] **Step 11: Export `resolveCitedValue`/`ResolvedValue` from `packages/shapes/src/index.ts`**
+- [x] **Step 11: Export `resolveCitedValue`/`ResolvedValue` from `packages/shapes/src/index.ts`**
 
 ```typescript
 export { resolveCitedValue, type ResolvedValue } from "./resolve"
@@ -758,12 +758,12 @@ export { resolveCitedValue, type ResolvedValue } from "./resolve"
 
 Add alongside the existing exports (do not reorder or remove any).
 
-- [ ] **Step 12: Run the whole package's test suite to confirm nothing regressed**
+- [x] **Step 12: Run the whole package's test suite to confirm nothing regressed**
 
 Run: `pnpm --filter @openfaster-standard/shapes test`
 Expected: PASS (every test in the package, old and new)
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 git add packages/shapes/src/ShapeForm.tsx packages/shapes/src/ShapeForm.test.tsx packages/shapes/src/ShapeTable.tsx packages/shapes/src/ShapeTable.test.tsx packages/shapes/src/index.ts

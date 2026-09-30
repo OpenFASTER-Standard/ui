@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@openfaster-standard/ui"
-import { displayTextFor, resolveCitedValue } from "./resolve"
+import { displayTextFor, LOADING_TEXT, resolveCitedValue } from "./resolve"
 import { getPropertyShapeInfo, getPropertyShapes, type ShapeGraph } from "./parse"
 
 export function ShapeTable({
@@ -12,27 +12,47 @@ export function ShapeTable({
   graph: ShapeGraph
   resolveSourceUri: (fileUri: string) => string
 }) {
-  const rows = nodeShapeIris.map((nodeShapeIri) => {
-    const propertyIris = getPropertyShapes(graph, nodeShapeIri)
-    const infos = propertyIris.map((iri) => ({ iri, ...getPropertyShapeInfo(graph, iri) }))
-    return { nodeShapeIri, infos }
-  })
+  const rows = useMemo(
+    () =>
+      nodeShapeIris.map((nodeShapeIri) => {
+        const propertyIris = getPropertyShapes(graph, nodeShapeIri)
+        const infos = propertyIris.map((iri) => ({ iri, ...getPropertyShapeInfo(graph, iri) }))
+        return { nodeShapeIri, infos }
+      }),
+    [graph, nodeShapeIris],
+  )
 
   // One column per distinct property name found across ALL given node
   // shapes, not just the first row -- the spec only defers *naming/
   // grouping* semantics for genuinely mismatched shapes, never silent
   // data loss for a row whose properties differ from the first row's.
-  const columns = [...new Set(rows.flatMap((row) => row.infos.map((info) => info.name)))]
+  const columns = useMemo(() => [...new Set(rows.flatMap((row) => row.infos.map((info) => info.name)))], [rows])
+
+  // resolveSourceUri is a pure mapping whose identity carries no real
+  // information -- see ShapeField's own identical comment.
+  const resolveSourceUriRef = useRef(resolveSourceUri)
+  useEffect(() => {
+    resolveSourceUriRef.current = resolveSourceUri
+  }, [resolveSourceUri])
 
   const [displayValues, setDisplayValues] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     let cancelled = false
+    setDisplayValues(new Map())
     const allPropertyIris = rows.flatMap((row) => row.infos.map((info) => info.iri))
     Promise.all(
       allPropertyIris.map(async (iri) => {
-        const result = await resolveCitedValue(graph, iri, resolveSourceUri)
-        return [iri, displayTextFor(result)] as const
+        // A single property's resolution failing outright (not a real
+        // ResolvedValue status, an actual throw) must not take the whole
+        // table's Promise.all -- and therefore every other cell -- down
+        // with it.
+        try {
+          const result = await resolveCitedValue(graph, iri, (u) => resolveSourceUriRef.current(u))
+          return [iri, displayTextFor(result)] as const
+        } catch {
+          return [iri, displayTextFor({ status: "fetch-failed" })] as const
+        }
       }),
     ).then((entries) => {
       if (!cancelled) setDisplayValues(new Map(entries))
@@ -40,8 +60,7 @@ export function ShapeTable({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph, resolveSourceUri, nodeShapeIris.join(",")])
+  }, [graph, rows])
 
   return (
     <Table>
@@ -65,7 +84,7 @@ export function ShapeTable({
               const matches = row.infos.filter((i) => i.name === name)
               const value =
                 matches.length > 0
-                  ? matches.map((m) => displayValues.get(m.iri) ?? "Resolving…").join(", ")
+                  ? matches.map((m) => displayValues.get(m.iri) ?? LOADING_TEXT).join(", ")
                   : "no value"
               return <TableCell key={name}>{value}</TableCell>
             })}

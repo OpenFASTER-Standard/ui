@@ -3,11 +3,13 @@ import { render, screen, waitFor } from "@testing-library/react"
 import { parseShapeGraph } from "./parse"
 import { ShapeForm } from "./ShapeForm"
 
+const REAL_DOCUMENTATION_TEXT = "Meldung nach § 45c Absatz 2 Satz 3 EStG."
+
 const REAL_FIXTURE_XML = `<?xml version="1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:complexType name="Meldeart23">
     <xs:annotation>
-      <xs:documentation>Meldung nach § 45c Absatz 2 Satz 3 EStG.</xs:documentation>
+      <xs:documentation>${REAL_DOCUMENTATION_TEXT}</xs:documentation>
     </xs:annotation>
   </xs:complexType>
 </xs:schema>`
@@ -64,12 +66,24 @@ describe("ShapeForm", () => {
 
   it("threads resolveSourceUri through to every rendered ShapeField", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(REAL_FIXTURE_XML) }))
+    // Must actually be used to resolve, not merely called -- returning a
+    // distinguishable (fake) URL and mocking fetch to succeed regardless
+    // proves the mapping's *result* reaches the real resolution path, not
+    // just that the callback was invoked.
     const resolveSourceUri = vi.fn().mockReturnValue("https://example.test/whatever.xsd")
     const graph = parseShapeGraph(TWO_CITED_PROPERTY_SHAPE)
 
     render(<ShapeForm nodeShapeIri="https://openfaster.org/ns/generator#S/Sh" graph={graph} resolveSourceUri={resolveSourceUri} />)
 
     await waitFor(() => expect(resolveSourceUri).toHaveBeenCalledTimes(2))
+    // Final-review Important#6: this test previously only asserted the
+    // call count -- it would have passed identically if both fields had
+    // rendered "Couldn't load source". Confirm both fields genuinely
+    // resolved to the real value, proving two ShapeFields citing the same
+    // source in one ShapeForm both resolve correctly (the plan's own
+    // Review Focus item this test exists for).
+    await waitFor(() => expect(screen.getByLabelText("First")).toHaveValue(REAL_DOCUMENTATION_TEXT))
+    expect(screen.getByLabelText("Second")).toHaveValue(REAL_DOCUMENTATION_TEXT)
   })
 })
 

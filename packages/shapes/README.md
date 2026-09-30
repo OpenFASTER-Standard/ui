@@ -24,16 +24,40 @@ import { parseShapeGraph, ShapeField } from "@openfaster-standard/shapes"
 
 const graph = parseShapeGraph(shapeTurtle)
 
+// Required, never defaulted (mirrors generator's own TargetStore(path)
+// convention): a citation's oa:hasSource is a file:// URI from wherever
+// the corpus was checked out when the citation was made -- this package
+// has no business guessing which real, fetchable URL that corresponds to
+// for your workspace. Below is a real example for the public
+// OpenFASTER-Standard/ontologies corpus, not a default.
+function resolveSourceUri(fileUri: string): string {
+  return fileUri.replace(
+    "file:///work/ontologies/",
+    "https://raw.githubusercontent.com/OpenFASTER-Standard/ontologies/main/",
+  )
+}
+
 function Example() {
-  return <ShapeField propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/AOrdNr" graph={graph} />
+  return (
+    <ShapeField
+      propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/AOrdNr"
+      graph={graph}
+      resolveSourceUri={resolveSourceUri}
+    />
+  )
 }
 ```
 
 `parseShapeGraph` parses a Turtle document into a queryable
 [N3.js](https://github.com/rdfjs/N3.js) `Store` wrapper; `ShapeField`/
 `ShapeForm`/`ShapeTable` render one or more `sh:PropertyShape`s from it as
-labeled, read-only fields, using `@openfaster-standard/ui`'s own `Form`/
-`Table` primitives for correct label association and layout.
+labeled fields, resolving and displaying each citation's real cited value
+(by re-fetching and re-evaluating its selector against its live source,
+client-side) rather than the raw provenance metadata, using
+`@openfaster-standard/ui`'s own `Form`/`Table` primitives for correct
+label association and layout. `resolveSourceUri` can safely be a fresh
+inline function on every render -- only its *behavior*, not its identity,
+affects when a field re-resolves.
 
 ## License
 
