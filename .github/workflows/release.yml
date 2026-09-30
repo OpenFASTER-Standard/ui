@@ -46,8 +46,20 @@ jobs:
       - run: pnpm --filter @openfaster-standard/ui exec tsc --noEmit
       - run: pnpm --filter @openfaster-standard/ui build
       - run: pnpm --filter @openfaster-standard/ui test
+      # @openfaster-standard/shapes depends on @openfaster-standard/ui's
+      # built dist/ (a workspace link, not source) -- these steps run
+      # after the ui build above, not before, deliberately.
+      - run: pnpm --filter @openfaster-standard/shapes exec tsc --noEmit
+      - run: pnpm --filter @openfaster-standard/shapes build
+      - run: pnpm --filter @openfaster-standard/shapes test
       - uses: changesets/action@v1
         with:
-          publish: pnpm --filter @openfaster-standard/ui publish
+          # `-r publish` walks every workspace package with a version bump
+          # pending from this run's `changeset version` step -- pinning to
+          # just `--filter @openfaster-standard/ui` here silently excluded
+          # every other package (first case: @openfaster-standard/shapes)
+          # from ever actually being published, despite changesets tracking
+          # and version-bumping it like any other releasable package.
+          publish: pnpm -r publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
