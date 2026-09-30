@@ -1,11 +1,11 @@
 import { FormControl, FormItem, FormLabel } from "@openfaster-standard/ui"
 import { DataFactory } from "n3"
-import { DASH_NS, getPropertyShapeInfo, type ShapeGraph } from "./parse"
+import { DASH_NS, getPropertyShapeInfo, subjectTermFor, type ShapeGraph } from "./parse"
 
 const { namedNode } = DataFactory
 
 function getEditorHint(graph: ShapeGraph, propertyShapeIri: string): string | null {
-  const quads = graph.store.getQuads(namedNode(propertyShapeIri), namedNode(DASH_NS + "editor"), null, null)
+  const quads = graph.store.getQuads(subjectTermFor(propertyShapeIri), namedNode(DASH_NS + "editor"), null, null)
   return quads.length > 0 ? quads[0].object.value : null
 }
 

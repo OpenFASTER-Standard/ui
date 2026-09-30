@@ -173,3 +173,25 @@ describe("getPropertyShapes order validation", () => {
     expect(result).toEqual(rawOrder)
   })
 })
+
+describe("blank-node property shapes", () => {
+  it("reads the real name and hash from an anonymous (blank-node) property shape", () => {
+    // I8: sh:property [ ... ] (an anonymous property shape) is the
+    // canonical SHACL authoring form -- confirmed live that the old
+    // code returned the blank node's own internal parser label
+    // ("n3-0") as both the "IRI" and, after re-wrapping it in
+    // namedNode(...), failed to find any of its real triples at all.
+    const blankNodeShape = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/BN> a sh:NodeShape ;
+  sh:property [ a sh:PropertyShape ; gen:contentHash "sha256:bn" ; sh:name "Anon" ] .
+`
+    const graph = parseShapeGraph(blankNodeShape)
+    const shapes = getPropertyShapes(graph, "https://openfaster.org/ns/generator#S/BN")
+    expect(shapes).toHaveLength(1)
+
+    const info = getPropertyShapeInfo(graph, shapes[0])
+    expect(info).toEqual({ name: "Anon", hash: "sha256:bn" })
+  })
+})

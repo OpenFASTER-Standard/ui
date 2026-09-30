@@ -1,12 +1,23 @@
-import { DataFactory, Parser, Store } from "n3"
+import { BlankNode, DataFactory, NamedNode, Parser, Store } from "n3"
 
-const { namedNode } = DataFactory
+const { namedNode, blankNode } = DataFactory
 
 export const SH_NS = "http://www.w3.org/ns/shacl#"
 export const GEN_NS = "https://openfaster.org/ns/generator#"
 export const DASH_NS = "http://datashapes.org/dash#"
 export const PROV_NS = "http://www.w3.org/ns/prov#"
 export const OA_NS = "http://www.w3.org/ns/oa#"
+
+// sh:property [ ... ] (an anonymous property shape) is the canonical
+// SHACL authoring form -- this package's own IDs are plain strings
+// (real IRIs from annotation_model, or an n3-internal blank-node label
+// like "n3-0" for an anonymous shape), so every lookup by ID must
+// reconstruct the right kind of term rather than always assuming a
+// NamedNode. IRIs in this system are always http(s):// URLs; n3's own
+// blank-node labels never contain "://", so this is a safe dispatch.
+export function subjectTermFor(id: string): NamedNode | BlankNode {
+  return id.includes("://") ? namedNode(id) : blankNode(id)
+}
 
 export class ShapeGraphParseError extends Error {}
 
@@ -31,7 +42,7 @@ export function getPropertyShapes(graph: ShapeGraph, nodeShapeIri: string): stri
   const iris = quads.map((q) => q.object.value)
 
   const orders = iris.map((iri) => {
-    const orderQuads = graph.store.getQuads(namedNode(iri), namedNode(SH_NS + "order"), null, null)
+    const orderQuads = graph.store.getQuads(subjectTermFor(iri), namedNode(SH_NS + "order"), null, null)
     if (orderQuads.length === 0) return null
     // A malformed value (non-numeric, or empty) must be treated exactly
     // like "no order at all". Two distinct traps here, both real:
@@ -59,10 +70,11 @@ export function getPropertyShapeInfo(
   graph: ShapeGraph,
   propertyShapeIri: string,
 ): { name: string; hash: string | null } {
-  const nameQuads = graph.store.getQuads(namedNode(propertyShapeIri), namedNode(SH_NS + "name"), null, null)
+  const subject = subjectTermFor(propertyShapeIri)
+  const nameQuads = graph.store.getQuads(subject, namedNode(SH_NS + "name"), null, null)
   const name = nameQuads.length > 0 ? nameQuads[0].object.value : propertyShapeIri.split("/").at(-1)!
 
-  const hashQuads = graph.store.getQuads(namedNode(propertyShapeIri), namedNode(GEN_NS + "contentHash"), null, null)
+  const hashQuads = graph.store.getQuads(subject, namedNode(GEN_NS + "contentHash"), null, null)
   const hash = hashQuads.length > 0 ? hashQuads[0].object.value : null
 
   return { name, hash }
