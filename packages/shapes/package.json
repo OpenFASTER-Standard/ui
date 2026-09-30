@@ -27,7 +27,7 @@
     }
   },
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist && tsup",
     "prepublishOnly": "pnpm build",
     "dev": "tsup --watch",
     "test": "vitest run",

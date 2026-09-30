@@ -6,7 +6,11 @@ export default defineConfig({
   dts: false,
   splitting: false,
   sourcemap: true,
-  clean: true,
+  // false: this package's build script now runs `rm -rf dist` itself,
+  // before tsc emits declarations -- tsup cleaning dist/ again here would
+  // wipe out the .d.ts files tsc just wrote, since tsc now runs first
+  // (see package.json's build script for why the order was flipped).
+  clean: false,
   external: ["react", "react-dom"],
   // A "use client" directive inlined in an individual source file only
   // survives bundling if it happens to land as the literal first

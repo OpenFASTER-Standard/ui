@@ -29,7 +29,7 @@
     "./style.css": "./dist/style.css"
   },
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist && tailwindcss -i ./src/index.css -o ./dist/style.css --minify && node scripts/copy-fonts.mjs",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist && tsup && tailwindcss -i ./src/index.css -o ./dist/style.css --minify && node scripts/copy-fonts.mjs",
     "prepublishOnly": "pnpm build",
     "dev": "tsup --watch",
     "test": "vitest run",
