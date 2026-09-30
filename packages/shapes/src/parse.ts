@@ -32,7 +32,18 @@ export function getPropertyShapes(graph: ShapeGraph, nodeShapeIri: string): stri
 
   const orders = iris.map((iri) => {
     const orderQuads = graph.store.getQuads(namedNode(iri), namedNode(SH_NS + "order"), null, null)
-    return orderQuads.length > 0 ? Number(orderQuads[0].object.value) : null
+    if (orderQuads.length === 0) return null
+    // A malformed value (non-numeric, or empty) must be treated exactly
+    // like "no order at all". Two distinct traps here, both real:
+    // Number("banana") is NaN (not strictly-equal to null, so a naive
+    // `!== null` check would still enter the sort branch with a
+    // corrupted comparator), and Number("") -- and Number("   ") -- is
+    // 0 (a perfectly *finite* number, so Number.isFinite alone does not
+    // catch it; it would silently outrank a real, valid order of e.g. 9).
+    const raw = orderQuads[0].object.value.trim()
+    if (raw === "") return null
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : null
   })
 
   if (orders.every((o) => o !== null)) {

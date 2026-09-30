@@ -1,5 +1,20 @@
+import { DataFactory } from "n3"
 import { describe, expect, it } from "vitest"
-import { getPropertyShapeInfo, getPropertyShapes, parseShapeGraph, ShapeGraphParseError } from "./parse"
+import { getPropertyShapeInfo, getPropertyShapes, parseShapeGraph, SH_NS, ShapeGraphParseError, type ShapeGraph } from "./parse"
+
+const { namedNode } = DataFactory
+
+// Ground truth: the raw, unsorted sh:property order the store itself
+// returns -- used to prove a fallback case returns exactly this (no
+// sorting attempted), rather than comparing against a second,
+// differently-shaped graph, whose own "store order" isn't guaranteed
+// to be comparable to a different graph's (confirmed live: two graphs
+// differing by only one triple did not reliably return matching order).
+function rawPropertyOrder(graph: ShapeGraph, nodeShapeIri: string): string[] {
+  return graph.store
+    .getQuads(namedNode(nodeShapeIri), namedNode(SH_NS + "property"), null, null)
+    .map((q) => q.object.value)
+}
 
 const VALID_SHAPE = `
 @prefix sh: <http://www.w3.org/ns/shacl#> .
@@ -103,5 +118,58 @@ describe("getPropertyShapeInfo", () => {
     const graph = parseShapeGraph(noHash)
     const info = getPropertyShapeInfo(graph, "https://openfaster.org/ns/generator#S/Sh/NoHash")
     expect(info).toEqual({ name: "NoHash", hash: null })
+  })
+})
+
+describe("getPropertyShapes order validation", () => {
+  it("treats a non-numeric sh:order exactly like no sh:order at all, not a corrupted sort", () => {
+    // Real, live-verified discriminator: with 5 property shapes whose
+    // valid orders are NOT already store-sequential (50, _, 10, 40, 20),
+    // the buggy version's `Number("banana")` -> NaN -> comparator
+    // corruption produces a genuinely reordered result (D/E swapped)
+    // instead of the raw, unsorted sh:property order. Compared against
+    // the store's own raw order (via rawPropertyOrder) within the SAME
+    // graph, not against a second, differently-shaped graph -- two
+    // graphs differing by even one triple are not guaranteed to report
+    // the same "store order" for an unrelated query (confirmed live).
+    const badOrder = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh3> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh3/A> ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh3/B> ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh3/C> ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh3/D> ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh3/E> .
+<https://openfaster.org/ns/generator#S/Sh3/A> a sh:PropertyShape ; gen:contentHash "sha256:a" ; sh:order 50 .
+<https://openfaster.org/ns/generator#S/Sh3/B> a sh:PropertyShape ; gen:contentHash "sha256:b" ; sh:order "banana" .
+<https://openfaster.org/ns/generator#S/Sh3/C> a sh:PropertyShape ; gen:contentHash "sha256:c" ; sh:order 10 .
+<https://openfaster.org/ns/generator#S/Sh3/D> a sh:PropertyShape ; gen:contentHash "sha256:d" ; sh:order 40 .
+<https://openfaster.org/ns/generator#S/Sh3/E> a sh:PropertyShape ; gen:contentHash "sha256:e" ; sh:order 20 .
+`
+    const graph = parseShapeGraph(badOrder)
+    const result = getPropertyShapes(graph, "https://openfaster.org/ns/generator#S/Sh3")
+    const rawOrder = rawPropertyOrder(graph, "https://openfaster.org/ns/generator#S/Sh3")
+
+    expect(result).toEqual(rawOrder)
+  })
+
+  it("treats an empty-string sh:order the same way, not as 0", () => {
+    // Number("") === 0, which would silently outrank a real order of 9
+    // if treated as a valid value instead of falling back.
+    const emptyOrder = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh4> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh4/A> ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh4/B> .
+<https://openfaster.org/ns/generator#S/Sh4/A> a sh:PropertyShape ; gen:contentHash "sha256:a" ; sh:order 9 .
+<https://openfaster.org/ns/generator#S/Sh4/B> a sh:PropertyShape ; gen:contentHash "sha256:b" ; sh:order "" .
+`
+    const graph = parseShapeGraph(emptyOrder)
+    const result = getPropertyShapes(graph, "https://openfaster.org/ns/generator#S/Sh4")
+    const rawOrder = rawPropertyOrder(graph, "https://openfaster.org/ns/generator#S/Sh4")
+
+    expect(result).toEqual(rawOrder)
   })
 })
