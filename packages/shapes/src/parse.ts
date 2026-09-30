@@ -1,3 +1,11 @@
+// @types/n3 only ever reached ^1.26.4 -- there is no published types
+// package covering n3's real v2.x API (the runtime dependency below).
+// The two APIs used here (Parser/Store/DataFactory, .addQuads,
+// getQuads/getSubjects with null wildcards) are unchanged between 1.x
+// and 2.x, so the 1.x types typecheck correctly against the 2.x
+// runtime in practice -- don't "fix" this version gap by downgrading
+// the runtime dependency to match, and don't be surprised if a future
+// n3 2.x release adds/changes an API these stale types don't know about.
 import { BlankNode, DataFactory, NamedNode, Parser, Store } from "n3"
 
 const { namedNode, blankNode } = DataFactory
