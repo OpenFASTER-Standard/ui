@@ -26,8 +26,15 @@ export function ShapeTable({ nodeShapeIris, graph }: { nodeShapeIris: string[]; 
         {rows.map((row) => (
           <TableRow key={row.nodeShapeIri}>
             {columns.map((name) => {
-              const info = row.infos.find((i) => i.name === name)
-              return <TableCell key={name}>{info?.hash ?? "no value"}</TableCell>
+              // sh:name is a display label, not a key -- two distinct
+              // property shapes in the same node shape can legally
+              // share one (e.g. a mislabeling via annotate_display_hint).
+              // A single cell can't give each its own column, but it
+              // must never silently drop one; show every matching
+              // value rather than picking just the first.
+              const matches = row.infos.filter((i) => i.name === name)
+              const value = matches.length > 0 ? matches.map((m) => m.hash ?? "no value").join(", ") : "no value"
+              return <TableCell key={name}>{value}</TableCell>
             })}
           </TableRow>
         ))}

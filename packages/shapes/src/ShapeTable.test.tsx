@@ -68,3 +68,27 @@ describe("ShapeTable with differing property sets", () => {
     expect(screen.getByText("sha256:bz")).toBeInTheDocument()
   })
 })
+
+describe("ShapeTable with two properties sharing one sh:name in the same row", () => {
+  it("shows both values instead of silently dropping the second", () => {
+    // M12: sh:name is a display label, not a key -- two DIFFERENT
+    // property shapes in the same node shape can legally share one
+    // (e.g. a mislabeling via annotate_display_hint). Matching a row's
+    // properties to a column by .find(name) picked only the first,
+    // silently dropping the second's data with no signal at all.
+    const sameNameTwice = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh> a sh:NodeShape ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh/p1> ;
+  sh:property <https://openfaster.org/ns/generator#S/Sh/p2> .
+<https://openfaster.org/ns/generator#S/Sh/p1> a sh:PropertyShape ; gen:contentHash "sha256:p1" ; sh:name "same" .
+<https://openfaster.org/ns/generator#S/Sh/p2> a sh:PropertyShape ; gen:contentHash "sha256:p2" ; sh:name "same" .
+`
+    const graph = parseShapeGraph(sameNameTwice)
+    render(<ShapeTable nodeShapeIris={["https://openfaster.org/ns/generator#S/Sh"]} graph={graph} />)
+
+    expect(screen.getByText(/sha256:p1/)).toBeInTheDocument()
+    expect(screen.getByText(/sha256:p2/)).toBeInTheDocument()
+  })
+})
