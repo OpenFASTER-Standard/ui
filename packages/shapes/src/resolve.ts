@@ -1,5 +1,5 @@
 import { DataFactory } from "n3"
-import { GEN_NS, OA_NS, PROV_NS, pickDeterministic, subjectTermFor, type ShapeGraph } from "./parse"
+import { OA_NS, PROV_NS, pickDeterministic, subjectTermFor, type ShapeGraph } from "./parse"
 
 const { namedNode } = DataFactory
 
@@ -12,6 +12,18 @@ export type ResolvedValue =
   | { status: "uncitable" }
 
 const XPATH_NAMESPACES: Record<string, string> = { xs: "http://www.w3.org/2001/XMLSchema" }
+
+export const RESOLVED_VALUE_STATUS_TEXT: Record<Exclude<ResolvedValue["status"], "resolved">, string> = {
+  "unsupported-selector-type": "(not yet supported for display)",
+  "fetch-failed": "Couldn't load source",
+  "not-found": "Not found in source",
+  ambiguous: "Ambiguous citation",
+  uncitable: "Not a citable value",
+}
+
+export function displayTextFor(result: ResolvedValue): string {
+  return result.status === "resolved" ? result.value : RESOLVED_VALUE_STATUS_TEXT[result.status]
+}
 
 export async function resolveCitedValue(
   graph: ShapeGraph,

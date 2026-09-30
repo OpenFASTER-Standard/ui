@@ -1,9 +1,20 @@
+import { useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@openfaster-standard/ui"
+import { displayTextFor, resolveCitedValue } from "./resolve"
 import { getPropertyShapeInfo, getPropertyShapes, type ShapeGraph } from "./parse"
 
-export function ShapeTable({ nodeShapeIris, graph }: { nodeShapeIris: string[]; graph: ShapeGraph }) {
+export function ShapeTable({
+  nodeShapeIris,
+  graph,
+  resolveSourceUri,
+}: {
+  nodeShapeIris: string[]
+  graph: ShapeGraph
+  resolveSourceUri: (fileUri: string) => string
+}) {
   const rows = nodeShapeIris.map((nodeShapeIri) => {
-    const infos = getPropertyShapes(graph, nodeShapeIri).map((iri) => getPropertyShapeInfo(graph, iri))
+    const propertyIris = getPropertyShapes(graph, nodeShapeIri)
+    const infos = propertyIris.map((iri) => ({ iri, ...getPropertyShapeInfo(graph, iri) }))
     return { nodeShapeIri, infos }
   })
 
@@ -12,6 +23,25 @@ export function ShapeTable({ nodeShapeIris, graph }: { nodeShapeIris: string[]; 
   // grouping* semantics for genuinely mismatched shapes, never silent
   // data loss for a row whose properties differ from the first row's.
   const columns = [...new Set(rows.flatMap((row) => row.infos.map((info) => info.name)))]
+
+  const [displayValues, setDisplayValues] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    const allPropertyIris = rows.flatMap((row) => row.infos.map((info) => info.iri))
+    Promise.all(
+      allPropertyIris.map(async (iri) => {
+        const result = await resolveCitedValue(graph, iri, resolveSourceUri)
+        return [iri, displayTextFor(result)] as const
+      }),
+    ).then((entries) => {
+      if (!cancelled) setDisplayValues(new Map(entries))
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph, resolveSourceUri, nodeShapeIris.join(",")])
 
   return (
     <Table>
@@ -33,7 +63,10 @@ export function ShapeTable({ nodeShapeIris, graph }: { nodeShapeIris: string[]; 
               // must never silently drop one; show every matching
               // value rather than picking just the first.
               const matches = row.infos.filter((i) => i.name === name)
-              const value = matches.length > 0 ? matches.map((m) => m.hash ?? "no value").join(", ") : "no value"
+              const value =
+                matches.length > 0
+                  ? matches.map((m) => displayValues.get(m.iri) ?? "Resolving…").join(", ")
+                  : "no value"
               return <TableCell key={name}>{value}</TableCell>
             })}
           </TableRow>

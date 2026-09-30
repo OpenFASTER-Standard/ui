@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react"
 import { FormControl, FormItem, FormLabel } from "@openfaster-standard/ui"
-import { resolveCitedValue, type ResolvedValue } from "./resolve"
+import { displayTextFor, resolveCitedValue, type ResolvedValue } from "./resolve"
 import { getPropertyShapeInfo, type ShapeGraph } from "./parse"
-
-const STATUS_TEXT: Record<Exclude<ResolvedValue["status"], "resolved">, string> = {
-  "unsupported-selector-type": "(not yet supported for display)",
-  "fetch-failed": "Couldn't load source",
-  "not-found": "Not found in source",
-  ambiguous: "Ambiguous citation",
-  uncitable: "Not a citable value",
-}
 
 export function ShapeField({
   propertyShapeIri,
@@ -34,8 +26,7 @@ export function ShapeField({
     }
   }, [graph, propertyShapeIri, resolveSourceUri])
 
-  const displayValue =
-    result === null ? "Resolving…" : result.status === "resolved" ? result.value : STATUS_TEXT[result.status]
+  const displayValue = result === null ? "Resolving…" : displayTextFor(result)
 
   return (
     <FormItem>

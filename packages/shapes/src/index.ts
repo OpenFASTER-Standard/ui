@@ -14,3 +14,4 @@ export {
 export { ShapeField } from "./ShapeField"
 export { ShapeForm } from "./ShapeForm"
 export { ShapeTable } from "./ShapeTable"
+export { resolveCitedValue, type ResolvedValue } from "./resolve"
