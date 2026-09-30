@@ -22,3 +22,10 @@ jobs:
       - run: pnpm --filter @openfaster-standard/ui build
       - run: pnpm --filter @openfaster-standard/ui test
       - run: pnpm --filter @openfaster-standard/ui build-storybook
+      # @openfaster-standard/shapes depends on @openfaster-standard/ui's
+      # built dist/ (a workspace link, not source) -- these steps run
+      # after the ui build above, not before, deliberately.
+      - run: pnpm --filter @openfaster-standard/shapes lint
+      - run: pnpm --filter @openfaster-standard/shapes exec tsc --noEmit
+      - run: pnpm --filter @openfaster-standard/shapes build
+      - run: pnpm --filter @openfaster-standard/shapes test
