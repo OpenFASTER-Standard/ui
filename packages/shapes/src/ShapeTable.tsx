@@ -7,11 +7,11 @@ export function ShapeTable({ nodeShapeIris, graph }: { nodeShapeIris: string[]; 
     return { nodeShapeIri, infos }
   })
 
-  // One column per distinct property name found across all given node
-  // shapes -- per this plan's Global Constraints, assumes every given
-  // node shape shares the same property names (the deferred case of
-  // genuinely different property sets is not this task's problem).
-  const columns = rows[0]?.infos.map((info) => info.name) ?? []
+  // One column per distinct property name found across ALL given node
+  // shapes, not just the first row -- the spec only defers *naming/
+  // grouping* semantics for genuinely mismatched shapes, never silent
+  // data loss for a row whose properties differ from the first row's.
+  const columns = [...new Set(rows.flatMap((row) => row.infos.map((info) => info.name)))]
 
   return (
     <Table>
