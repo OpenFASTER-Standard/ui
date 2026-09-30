@@ -227,6 +227,61 @@ describe("getPropertyShapeInfo fallback label decoding, malformed percent-sequen
   })
 })
 
+describe("duplicate predicates resolve deterministically", () => {
+  // gen:contentHash/sh:name are meant to be single-valued -- every real
+  // producer (annotation_model.rdf's citation functions, and
+  // annotate_display_hint's remove-then-add for sh:name) enforces that by
+  // construction. A graph with two triples for the same predicate on the
+  // same subject is therefore already malformed (hand-edited, or a bug
+  // upstream), but this package still has to render *something* for it,
+  // and it must render the *same* something every time -- not whichever
+  // quad the store's internal iteration order happens to return first,
+  // which is an implementation detail, not a documented contract.
+  it("picks the same gen:contentHash regardless of which duplicate triple was written first", () => {
+    const hashFirst = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh/Dup> a sh:PropertyShape ;
+  gen:contentHash "sha256:aaa" ;
+  gen:contentHash "sha256:bbb" ;
+  sh:name "Dup" .
+`
+    const hashSecond = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh/Dup> a sh:PropertyShape ;
+  gen:contentHash "sha256:bbb" ;
+  gen:contentHash "sha256:aaa" ;
+  sh:name "Dup" .
+`
+    const infoA = getPropertyShapeInfo(parseShapeGraph(hashFirst), "https://openfaster.org/ns/generator#S/Sh/Dup")
+    const infoB = getPropertyShapeInfo(parseShapeGraph(hashSecond), "https://openfaster.org/ns/generator#S/Sh/Dup")
+    expect(infoA.hash).toBe(infoB.hash)
+  })
+
+  it("picks the same sh:name regardless of which duplicate triple was written first", () => {
+    const nameFirst = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh/DupName> a sh:PropertyShape ;
+  gen:contentHash "sha256:x" ;
+  sh:name "Alpha" ;
+  sh:name "Zeta" .
+`
+    const nameSecond = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh/DupName> a sh:PropertyShape ;
+  gen:contentHash "sha256:x" ;
+  sh:name "Zeta" ;
+  sh:name "Alpha" .
+`
+    const infoA = getPropertyShapeInfo(parseShapeGraph(nameFirst), "https://openfaster.org/ns/generator#S/Sh/DupName")
+    const infoB = getPropertyShapeInfo(parseShapeGraph(nameSecond), "https://openfaster.org/ns/generator#S/Sh/DupName")
+    expect(infoA.name).toBe(infoB.name)
+  })
+})
+
 describe("getPropertyShapeInfo term-type guard on sh:name", () => {
   it("falls back to the IRI segment when sh:name is a blank node, not a literal", () => {
     // M11: sh:name [ ] is legal Turtle syntax (a blank node object) even

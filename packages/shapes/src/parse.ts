@@ -45,6 +45,22 @@ export function parseShapeGraph(turtle: string): ShapeGraph {
   return new ShapeGraph(store)
 }
 
+// gen:contentHash/sh:name/sh:order/dash:editor are meant to be
+// single-valued -- every real producer (annotation_model.rdf's citation
+// functions, annotate_display_hint's remove-then-add) enforces that by
+// construction. A graph with two triples for the same predicate on the
+// same subject is already malformed (hand-edited, or a bug upstream), but
+// this package still has to render *something*, and the same something
+// every time -- not whichever quad the store's internal iteration order
+// happens to return first, which is an implementation detail, not a
+// documented contract. Sort by lexical value and take the smallest: an
+// arbitrary tie-break, not a "correct" one -- the point is only that the
+// same malformed graph always renders the same way.
+export function pickDeterministic<T extends { object: { value: string } }>(quads: T[]): T | undefined {
+  if (quads.length === 0) return undefined
+  return [...quads].sort((a, b) => (a.object.value < b.object.value ? -1 : a.object.value > b.object.value ? 1 : 0))[0]
+}
+
 export function getPropertyShapes(graph: ShapeGraph, nodeShapeIri: string): string[] {
   const quads = graph.store.getQuads(namedNode(nodeShapeIri), namedNode(SH_NS + "property"), null, null)
   const iris = quads.map((q) => q.object.value)
@@ -59,7 +75,7 @@ export function getPropertyShapes(graph: ShapeGraph, nodeShapeIri: string): stri
     // corrupted comparator), and Number("") -- and Number("   ") -- is
     // 0 (a perfectly *finite* number, so Number.isFinite alone does not
     // catch it; it would silently outrank a real, valid order of e.g. 9).
-    const raw = orderQuads[0].object.value.trim()
+    const raw = pickDeterministic(orderQuads)!.object.value.trim()
     if (raw === "") return null
     const parsed = Number(raw)
     return Number.isFinite(parsed) ? parsed : null
@@ -97,11 +113,12 @@ export function getPropertyShapeInfo(
   // nonsensical as a display label -- guard on termType so it degrades
   // to the IRI fallback instead of leaking a parser-internal blank-node
   // label (e.g. "n3-2") into the UI.
-  const nameLiteral = nameQuads.find((q) => q.object.termType === "Literal")
+  const nameLiteral = pickDeterministic(nameQuads.filter((q) => q.object.termType === "Literal"))
   const name = nameLiteral ? nameLiteral.object.value : fallbackName
 
   const hashQuads = graph.store.getQuads(subject, namedNode(GEN_NS + "contentHash"), null, null)
-  const hash = hashQuads.length > 0 ? hashQuads[0].object.value : null
+  const hashQuad = pickDeterministic(hashQuads)
+  const hash = hashQuad ? hashQuad.object.value : null
 
   return { name, hash }
 }

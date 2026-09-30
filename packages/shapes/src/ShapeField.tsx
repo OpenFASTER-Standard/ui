@@ -1,6 +1,6 @@
 import { FormControl, FormItem, FormLabel } from "@openfaster-standard/ui"
 import { DataFactory } from "n3"
-import { DASH_NS, getPropertyShapeInfo, subjectTermFor, type ShapeGraph } from "./parse"
+import { DASH_NS, getPropertyShapeInfo, pickDeterministic, subjectTermFor, type ShapeGraph } from "./parse"
 
 const { namedNode } = DataFactory
 
@@ -14,7 +14,7 @@ function getEditorHint(graph: ShapeGraph, propertyShapeIri: string): string | nu
   // (the caller only checks this for "not TextFieldEditor", never
   // branches on the specific string), but correct regardless of what a
   // future widget-kind dispatch does with it.
-  const editorTerm = quads.find((q) => q.object.termType === "NamedNode")
+  const editorTerm = pickDeterministic(quads.filter((q) => q.object.termType === "NamedNode"))
   return editorTerm ? editorTerm.object.value : null
 }
 
