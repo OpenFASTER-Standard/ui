@@ -72,7 +72,25 @@ export function getPropertyShapeInfo(
 ): { name: string; hash: string | null } {
   const subject = subjectTermFor(propertyShapeIri)
   const nameQuads = graph.store.getQuads(subject, namedNode(SH_NS + "name"), null, null)
-  const name = nameQuads.length > 0 ? nameQuads[0].object.value : propertyShapeIri.split("/").at(-1)!
+  // annotation_model._iri_segment percent-encodes every IRI segment, so
+  // decode the fallback (a real property with no sh:name yet would
+  // otherwise show e.g. "a%20value" instead of "a value"). A malformed
+  // %-sequence in a hand-authored (non-generator) shape falls back to
+  // the raw, undecoded segment rather than throwing.
+  const fallbackName = (() => {
+    const segment = propertyShapeIri.split("/").at(-1)!
+    try {
+      return decodeURIComponent(segment)
+    } catch {
+      return segment
+    }
+  })()
+  // sh:name [ ] (a blank-node object) is legal Turtle even though it's
+  // nonsensical as a display label -- guard on termType so it degrades
+  // to the IRI fallback instead of leaking a parser-internal blank-node
+  // label (e.g. "n3-2") into the UI.
+  const nameLiteral = nameQuads.find((q) => q.object.termType === "Literal")
+  const name = nameLiteral ? nameLiteral.object.value : fallbackName
 
   const hashQuads = graph.store.getQuads(subject, namedNode(GEN_NS + "contentHash"), null, null)
   const hash = hashQuads.length > 0 ? hashQuads[0].object.value : null

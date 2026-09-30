@@ -195,3 +195,53 @@ describe("blank-node property shapes", () => {
     expect(info).toEqual({ name: "Anon", hash: "sha256:bn" })
   })
 })
+
+describe("getPropertyShapeInfo fallback label decoding", () => {
+  it("percent-decodes the IRI's local segment when sh:name is absent", () => {
+    // M9: annotation_model._iri_segment percent-encodes every segment
+    // (a space becomes %20), so a real generator-produced property with
+    // no sh:name yet would otherwise show its encoded form verbatim.
+    const noName = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh/a%20value> a sh:PropertyShape ;
+  gen:contentHash "sha256:xyz" .
+`
+    const graph = parseShapeGraph(noName)
+    const info = getPropertyShapeInfo(graph, "https://openfaster.org/ns/generator#S/Sh/a%20value")
+    expect(info.name).toBe("a value")
+  })
+})
+
+describe("getPropertyShapeInfo fallback label decoding, malformed percent-sequence", () => {
+  it("falls back to the raw segment when it is not valid percent-encoding", () => {
+    const malformed = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh/bad%zz> a sh:PropertyShape ;
+  gen:contentHash "sha256:xyz" .
+`
+    const graph = parseShapeGraph(malformed)
+    const info = getPropertyShapeInfo(graph, "https://openfaster.org/ns/generator#S/Sh/bad%zz")
+    expect(info.name).toBe("bad%zz")
+  })
+})
+
+describe("getPropertyShapeInfo term-type guard on sh:name", () => {
+  it("falls back to the IRI segment when sh:name is a blank node, not a literal", () => {
+    // M11: sh:name [ ] is legal Turtle syntax (a blank node object) even
+    // though it's nonsensical as a display label -- reading .value
+    // unconditionally would leak the parser's internal blank-node label
+    // (e.g. "n3-2") into the UI instead of degrading to the IRI fallback.
+    const weirdName = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix gen: <https://openfaster.org/ns/generator#> .
+<https://openfaster.org/ns/generator#S/Sh/Weird> a sh:PropertyShape ;
+  gen:contentHash "sha256:w" ;
+  sh:name [] .
+`
+    const graph = parseShapeGraph(weirdName)
+    const info = getPropertyShapeInfo(graph, "https://openfaster.org/ns/generator#S/Sh/Weird")
+    expect(info.name).toBe("Weird")
+  })
+})
