@@ -15,10 +15,17 @@ export {
 export { ShapeField } from "./ShapeField"
 export { ShapeForm } from "./ShapeForm"
 export { ShapeTable } from "./ShapeTable"
+export { ReCitationPicker } from "./ReCitationPicker"
+export { SourceDocumentTree } from "./SourceDocumentTree"
+export { computeXPathForElement } from "./computeXPath"
 export {
   resolveCitedValue,
+  findCitation,
+  fetchSourceDocument,
+  evaluateXPathAgainstDocument,
   displayTextFor,
   RESOLVED_VALUE_STATUS_TEXT,
   LOADING_TEXT,
   type ResolvedValue,
+  type Citation,
 } from "./resolve"

@@ -14,4 +14,13 @@ describe("package public surface", () => {
     expect(shapes.OA_NS).toBe("http://www.w3.org/ns/oa#")
     expect(shapes.RDF_NS).toBe("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
   })
+
+  it("exports the re-citation editing surface added in this task", () => {
+    expect(typeof shapes.ReCitationPicker).toBe("function")
+    expect(typeof shapes.SourceDocumentTree).toBe("function")
+    expect(typeof shapes.computeXPathForElement).toBe("function")
+    expect(typeof shapes.findCitation).toBe("function")
+    expect(typeof shapes.fetchSourceDocument).toBe("function")
+    expect(typeof shapes.evaluateXPathAgainstDocument).toBe("function")
+  })
 })
