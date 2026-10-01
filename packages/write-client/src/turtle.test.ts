@@ -1,5 +1,5 @@
-import { DataFactory, Parser, Store } from "n3"
-import { describe, expect, it } from "vitest"
+import { DataFactory, Parser, Store, Writer } from "n3"
+import { describe, expect, it, vi } from "vitest"
 import { DASH_NS, GEN_NS, OA_NS, PROV_NS, RDF_NS, SH_NS } from "@openfaster-standard/shapes"
 import { upsertCitation } from "./turtle"
 
@@ -196,5 +196,15 @@ _:shared sh:name "shared" .
     expect(sharedQuads).toHaveLength(2)
     expect(sharedQuads[0].object.value).toBe(sharedQuads[1].object.value)
     expect(store.getQuads(sharedQuads[0].object, namedNode(`${SH_NS}name`), null, null)[0].object.value).toBe("shared")
+  })
+
+  // Final-review Minor#22: upsertCitation assumes n3's Writer.end fires
+  // its callback synchronously (true today) -- making that assumption
+  // explicit means a future change to that behavior fails loudly instead
+  // of silently returning an empty string.
+  it("throws rather than silently returning an empty string if Writer.end doesn't call back synchronously", () => {
+    const endSpy = vi.spyOn(Writer.prototype, "end").mockImplementation(() => {})
+    expect(() => upsertCitation(EXISTING_TURTLE, EDIT)).toThrow()
+    endSpy.mockRestore()
   })
 })

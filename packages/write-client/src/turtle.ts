@@ -148,10 +148,14 @@ function serializeNested(quads: Quad[], prefixes: Record<string, string>): strin
     writer.addQuad(quad.subject, quad.predicate, termFor(quad.object))
   }
 
-  let result = ""
+  // Writer.end's callback fires synchronously today -- made explicit here
+  // (rather than silently returning "" if that ever changed) with a
+  // sentinel distinguishable from any real Turtle output.
+  let result: string | undefined
   writer.end((error, turtle) => {
     if (error) throw error
     result = turtle
   })
+  if (result === undefined) throw new Error("n3 Writer.end did not call back synchronously")
   return result
 }
