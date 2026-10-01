@@ -14,7 +14,16 @@ import { fetchFile, putFile } from "./github"
 
 export { computeContentHash } from "./contentHash"
 export { upsertCitation, type CitationEdit } from "./turtle"
-export { fetchFile, putFile, type FetchFileResult, type PutFileResult } from "./github"
+export {
+  fetchFile,
+  putFile,
+  listShapeFiles,
+  getDefaultBranch,
+  type FetchFileResult,
+  type PutFileResult,
+  type ListShapeFilesResult,
+  type GetDefaultBranchResult,
+} from "./github"
 
 // A propertyShapeIri not shaped exactly this way can only mean the
 // pending edit didn't really come from a real, previously-
@@ -24,6 +33,14 @@ export { fetchFile, putFile, type FetchFileResult, type PutFileResult } from "./
 export function parsePropertyShapeIri(iri: string): { standard: string; shapeName: string; propertyName: string } {
   const [standard, shapeName, propertyName] = iri.slice(GEN_NS.length).split("/").map(decodeURIComponent)
   return { standard, shapeName, propertyName }
+}
+
+// Same decoding as parsePropertyShapeIri, one segment shorter -- a caller
+// that only has a discovered node shape IRI (e.g. from getNodeShapes) needs
+// this to re-derive the real file path via slugify.
+export function parseNodeShapeIri(iri: string): { standard: string; shapeName: string } {
+  const [standard, shapeName] = iri.slice(GEN_NS.length).split("/").map(decodeURIComponent)
+  return { standard, shapeName }
 }
 
 async function sha256Hex(value: string): Promise<string> {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { fetchFile, putFile } from "./github"
+import { fetchFile, getDefaultBranch, listShapeFiles, putFile } from "./github"
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -144,5 +144,66 @@ describe("putFile", () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe("https://api.github.com/repos/o/r/contents/shapes/a%20b.ttl")
     expect((JSON.parse(init.body as string) as { branch: string }).branch).toBe("feature#1")
+  })
+})
+
+describe("listShapeFiles", () => {
+  it("returns only shapes/**/*.ttl blob paths from a realistic tree response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            tree: [
+              { path: "shapes/mikadiv-fm-fb3a934d/meldeart23-0f68f206.ttl", type: "blob" },
+              { path: "shapes/mikadiv-fm-fb3a934d", type: "tree" },
+              { path: "mikadiv-fm/references.json", type: "blob" },
+              { path: "shapes/mikadiv-fm-fb3a934d/README.md", type: "blob" },
+            ],
+          }),
+      }),
+    )
+    expect(await listShapeFiles("o", "r", "main", "tok")).toEqual({
+      status: "ok",
+      paths: ["shapes/mikadiv-fm-fb3a934d/meldeart23-0f68f206.ttl"],
+    })
+  })
+
+  it("returns auth-failed for a 401", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 401, json: () => Promise.resolve({}) }))
+    expect(await listShapeFiles("o", "r", "main", "tok")).toEqual({ status: "auth-failed" })
+  })
+
+  it("returns network-error when fetch rejects", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")))
+    expect(await listShapeFiles("o", "r", "main", "tok")).toEqual({ status: "network-error" })
+  })
+})
+
+describe("getDefaultBranch", () => {
+  it("returns the repo's real default_branch", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200, json: () => Promise.resolve({ default_branch: "main" }) }))
+    expect(await getDefaultBranch("o", "r", "tok")).toEqual({ status: "ok", branch: "main" })
+  })
+
+  // Final-review-style finding, caught live while writing this plan: a
+  // garbage/expired token returns 401 regardless of whether the repo
+  // exists (confirmed live via curl against a real nonexistent repo with
+  // a real valid token vs. a fake token against a real repo -- the two
+  // are genuinely distinguishable statuses, not the same failure twice).
+  it("returns not-found for a 404, distinct from auth-failed", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 404, json: () => Promise.resolve({}) }))
+    expect(await getDefaultBranch("o", "r", "tok")).toEqual({ status: "not-found" })
+  })
+
+  it("returns auth-failed for a 403", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 403, json: () => Promise.resolve({}) }))
+    expect(await getDefaultBranch("o", "r", "tok")).toEqual({ status: "auth-failed" })
+  })
+
+  it("returns network-error when fetch rejects", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")))
+    expect(await getDefaultBranch("o", "r", "tok")).toEqual({ status: "network-error" })
   })
 })

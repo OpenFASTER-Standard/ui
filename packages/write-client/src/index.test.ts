@@ -1,7 +1,7 @@
 import { Parser, Store } from "n3"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { GEN_NS, OA_NS, PROV_NS, RDF_NS, SH_NS } from "@openfaster-standard/shapes"
-import { commitReCitation, parsePropertyShapeIri, slugify } from "./index"
+import { commitReCitation, parseNodeShapeIri, parsePropertyShapeIri, slugify } from "./index"
 
 describe("parsePropertyShapeIri", () => {
   it("splits a real property shape IRI into its three decoded segments", () => {
@@ -21,6 +21,19 @@ describe("parsePropertyShapeIri", () => {
       shapeName: "Meldeart23",
       propertyName: "Doc",
     })
+  })
+})
+
+describe("parseNodeShapeIri", () => {
+  it("splits a real node shape IRI into its two decoded segments", () => {
+    expect(parseNodeShapeIri(`${GEN_NS}MiKaDiv_FM/Meldeart23`)).toEqual({
+      standard: "MiKaDiv_FM",
+      shapeName: "Meldeart23",
+    })
+  })
+
+  it("decodes a percent-encoded literal slash back into one segment, not two", () => {
+    expect(parseNodeShapeIri(`${GEN_NS}A%2FB/Meldeart23`)).toEqual({ standard: "A/B", shapeName: "Meldeart23" })
   })
 })
 

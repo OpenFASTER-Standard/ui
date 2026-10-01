@@ -15,6 +15,17 @@ export type PutFileResult =
   | { status: "auth-failed" }
   | { status: "network-error" }
 
+export type ListShapeFilesResult =
+  | { status: "ok"; paths: string[] }
+  | { status: "auth-failed" }
+  | { status: "network-error" }
+
+export type GetDefaultBranchResult =
+  | { status: "ok"; branch: string }
+  | { status: "not-found" }
+  | { status: "auth-failed" }
+  | { status: "network-error" }
+
 // Percent-encodes each path segment independently, leaving "/" itself
 // alone -- a segment containing a space or other reserved character must
 // not silently change which file the request addresses.
@@ -110,6 +121,51 @@ export async function putFile(
   try {
     const body = await response.json()
     return { status: "ok", commitSha: body.commit.sha as string }
+  } catch {
+    return { status: "network-error" }
+  }
+}
+
+export async function listShapeFiles(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+): Promise<ListShapeFilesResult> {
+  let response: Response
+  try {
+    response = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
+      headers: GITHUB_HEADERS(token),
+    })
+  } catch {
+    return { status: "network-error" }
+  }
+  if (response.status === 401 || response.status === 403) return { status: "auth-failed" }
+
+  try {
+    const body = await response.json()
+    const paths = (body.tree as { path: string; type: string }[])
+      .filter((entry) => entry.type === "blob" && entry.path.startsWith("shapes/") && entry.path.endsWith(".ttl"))
+      .map((entry) => entry.path)
+    return { status: "ok", paths }
+  } catch {
+    return { status: "network-error" }
+  }
+}
+
+export async function getDefaultBranch(owner: string, repo: string, token: string): Promise<GetDefaultBranchResult> {
+  let response: Response
+  try {
+    response = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: GITHUB_HEADERS(token) })
+  } catch {
+    return { status: "network-error" }
+  }
+  if (response.status === 404) return { status: "not-found" }
+  if (response.status === 401 || response.status === 403) return { status: "auth-failed" }
+
+  try {
+    const body = await response.json()
+    return { status: "ok", branch: body.default_branch as string }
   } catch {
     return { status: "network-error" }
   }
