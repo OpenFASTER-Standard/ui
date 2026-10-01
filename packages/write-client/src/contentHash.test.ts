@@ -77,4 +77,72 @@ describe("computeContentHash", () => {
       "sha256:" + (await sha256Hex('<xs:element xmlns:xs="http://www.w3.org/2001/XMLSchema" name="AOrdNr"></xs:element>')),
     )
   })
+
+  // Final-review Critical#1: C14N sorts attributes by (namespace URI,
+  // local name), not document order -- confirmed live against 330 real
+  // corpus elements with >=2 attributes, 136 of which have a document
+  // order that differs from C14N's. All four attributes here are
+  // unprefixed (no namespace), so the sort is purely alphabetical by
+  // local name: maxOccurs, minOccurs, name, type.
+  it("sorts attributes by namespace URI then local name, not document order (C1)", async () => {
+    const doc = parse(`<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:std="http://www.itzbund.de/MiKaDiv/FMStd/1.02">
+  <xs:element name="AOrdNr" type="std:UUIDType" minOccurs="1" maxOccurs="3000"/>
+</xs:schema>`)
+    const el = doc.getElementsByTagNameNS("http://www.w3.org/2001/XMLSchema", "element")[0]
+    // Ground truth: lxml produced
+    // b'<xs:element xmlns:std="..." xmlns:xs="...">maxOccurs="3000" minOccurs="1" name="AOrdNr" type="std:UUIDType"></xs:element>'
+    expect(await computeContentHash(el)).toBe(
+      "sha256:6d547c0efc2f37c07714a4b19d8700b105c920504133b999f24a7586234a4b03",
+    )
+  })
+
+  // Final-review Critical#2: lxml's inclusive C14N defaults to
+  // with_comments=True -- comments inside the hashed subtree are part of
+  // its canonical form, not dropped. Real, not hypothetical: this corpus
+  // has a comment nested inside a real citable xs:complexType.
+  it("preserves a comment nested inside the hashed element (C2)", async () => {
+    const doc = parse(`<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:complexType name="StornomeldungType">
+    <!-- a real comment -->
+    <xs:documentation>Hallo Welt.</xs:documentation>
+  </xs:complexType>
+</xs:schema>`)
+    const el = doc.getElementsByTagNameNS("http://www.w3.org/2001/XMLSchema", "complexType")[0]
+    expect(await computeContentHash(el)).toBe(
+      "sha256:f882d8c6ce71885744312353727e4944ebc3beff0eebc794ac47e975e6e3a695",
+    )
+  })
+
+  // Final-review Important#9: a CDATA section is nodeType 4
+  // (CDATA_SECTION_NODE), not TEXT_NODE -- it was falling through to the
+  // default "" case, silently hashing an element's content as empty
+  // instead of throwing or mismatching loudly.
+  it("merges a CDATA section into escaped text content, matching lxml (I9)", async () => {
+    const doc = parse(`<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:documentation><![CDATA[Hallo & <Welt>.]]></xs:documentation>
+</xs:schema>`)
+    const el = doc.getElementsByTagNameNS("http://www.w3.org/2001/XMLSchema", "documentation")[0]
+    expect(await computeContentHash(el)).toBe(
+      "sha256:fdc9722fc805233a7eb082bdf2b84d757c21c5e4fb72b292b617439726eaf6fe",
+    )
+  })
+
+  // Final-review Important#8: a descendant can introduce its own
+  // namespace not visible anywhere in the hashed element's own ancestor
+  // chain (xs:documentation's content model is `any`, so XHTML-in-
+  // documentation is a standard XSD idiom) -- the old implementation only
+  // ever rendered namespaces on the root.
+  it("renders a namespace a descendant declares on its own, not just the root's in-scope set (I8)", async () => {
+    const doc = parse(`<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:documentation><p xmlns="http://www.w3.org/1999/xhtml">Hallo</p></xs:documentation>
+</xs:schema>`)
+    const el = doc.getElementsByTagNameNS("http://www.w3.org/2001/XMLSchema", "documentation")[0]
+    expect(await computeContentHash(el)).toBe(
+      "sha256:bb109ab01928637eac584eb96812357e7ad7635c51d11a044a41a0960eb85c62",
+    )
+  })
 })
