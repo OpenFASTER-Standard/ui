@@ -62,6 +62,12 @@ export function pickDeterministic<T extends { object: { value: string } }>(quads
   return [...quads].sort((a, b) => (a.object.value < b.object.value ? -1 : a.object.value > b.object.value ? 1 : 0))[0]
 }
 
+export function getNodeShapes(graph: ShapeGraph): string[] {
+  return graph.store
+    .getQuads(null, namedNode(RDF_NS + "type"), namedNode(SH_NS + "NodeShape"), null)
+    .map((q) => q.subject.value)
+}
+
 export function getPropertyShapes(graph: ShapeGraph, nodeShapeIri: string): string[] {
   const quads = graph.store.getQuads(namedNode(nodeShapeIri), namedNode(SH_NS + "property"), null, null)
   const iris = quads.map((q) => q.object.value)

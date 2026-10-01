@@ -1,6 +1,6 @@
 import { DataFactory } from "n3"
 import { describe, expect, it } from "vitest"
-import { getPropertyShapeInfo, getPropertyShapes, parseShapeGraph, SH_NS, ShapeGraphParseError, type ShapeGraph } from "./parse"
+import { getNodeShapes, getPropertyShapeInfo, getPropertyShapes, parseShapeGraph, SH_NS, ShapeGraphParseError, type ShapeGraph } from "./parse"
 
 const { namedNode } = DataFactory
 
@@ -298,5 +298,26 @@ describe("getPropertyShapeInfo term-type guard on sh:name", () => {
     const graph = parseShapeGraph(weirdName)
     const info = getPropertyShapeInfo(graph, "https://openfaster.org/ns/generator#S/Sh/Weird")
     expect(info.name).toBe("Weird")
+  })
+})
+
+const TWO_NODE_SHAPES = `
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+<https://openfaster.org/ns/generator#A/B> a sh:NodeShape .
+<https://openfaster.org/ns/generator#C/D> a sh:NodeShape .
+`
+
+describe("getNodeShapes", () => {
+  it("returns every real sh:NodeShape subject in the graph", () => {
+    const graph = parseShapeGraph(TWO_NODE_SHAPES)
+    expect(getNodeShapes(graph).sort()).toEqual([
+      "https://openfaster.org/ns/generator#A/B",
+      "https://openfaster.org/ns/generator#C/D",
+    ])
+  })
+
+  it("returns an empty array for a graph with no node shapes", () => {
+    const graph = parseShapeGraph("@prefix sh: <http://www.w3.org/ns/shacl#> .")
+    expect(getNodeShapes(graph)).toEqual([])
   })
 })

@@ -22,6 +22,7 @@ describe("package public surface", () => {
     expect(typeof shapes.findCitation).toBe("function")
     expect(typeof shapes.fetchSourceDocument).toBe("function")
     expect(typeof shapes.evaluateXPathAgainstDocument).toBe("function")
+    expect(typeof shapes.getNodeShapes).toBe("function")
   })
 
   // write-client's final review (Minor#15) found it had hand-copied this

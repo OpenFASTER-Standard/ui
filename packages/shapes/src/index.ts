@@ -2,6 +2,7 @@ export {
   parseShapeGraph,
   ShapeGraph,
   ShapeGraphParseError,
+  getNodeShapes,
   getPropertyShapes,
   getPropertyShapeInfo,
   subjectTermFor,
