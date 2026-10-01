@@ -3,6 +3,7 @@ import {
   findCitation,
   fetchSourceDocument,
   evaluateXPathAgainstDocument,
+  documentNamespaceResolver,
   GEN_NS,
   ShapeGraph,
   type ResolvedValue,
@@ -10,6 +11,10 @@ import {
 import { computeContentHash } from "./contentHash"
 import { upsertCitation } from "./turtle"
 import { fetchFile, putFile } from "./github"
+
+export { computeContentHash } from "./contentHash"
+export { upsertCitation, type CitationEdit } from "./turtle"
+export { fetchFile, putFile, type FetchFileResult, type PutFileResult } from "./github"
 
 // A propertyShapeIri not shaped exactly this way can only mean the
 // pending edit didn't really come from a real, previously-
@@ -32,7 +37,7 @@ async function sha256Hex(value: string): Promise<string> {
 // the readable part alone is not injective ("MiKaDiv_FM"/"MiKaDiv-FM"
 // collapse to the same string), so a short hash of the *original* value
 // is appended to guarantee every distinct input maps to a distinct slug.
-async function slugify(value: string): Promise<string> {
+export async function slugify(value: string): Promise<string> {
   const base = value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -82,12 +87,18 @@ export async function commitReCitation(
 
   // evaluateXPathAgainstDocument only returns a string (ResolvedValue) --
   // computeContentHash needs the real Element, so re-run the identical
-  // doc.evaluate() call it uses internally (same namespace resolver via
-  // documentElement.lookupNamespaceURI, same ORDERED_NODE_SNAPSHOT_TYPE
-  // request) to get it directly.
+  // doc.evaluate() call it uses internally (the real, shared
+  // documentNamespaceResolver, same ORDERED_NODE_SNAPSHOT_TYPE request)
+  // to get it directly, instead of a second, hand-copied construction of
+  // the same resolver that could silently drift from the real one.
   const doc = fetched.doc
-  const nsResolver = (prefix: string | null) => (prefix ? doc.documentElement.lookupNamespaceURI(prefix) : null)
-  const snapshot = doc.evaluate(edit.newXPath, doc, nsResolver, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null)
+  const snapshot = doc.evaluate(
+    edit.newXPath,
+    doc,
+    documentNamespaceResolver(doc),
+    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+    null,
+  )
   const element = snapshot.snapshotItem(0) as Element
 
   const contentHash = await computeContentHash(element)

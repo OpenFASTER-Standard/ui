@@ -15,4 +15,6 @@ discriminated union (`committed`/`resolution-failed`/`conflict`/
 `computeContentHash` (real inclusive XML C14N + SHA-256, matching
 `generator`'s own `canonicalize_and_hash_xml`), `upsertCitation`/
 `CitationEdit` (a Turtle upsert mirroring `clear_property_shape`/
-`_annotate`), `fetchFile`/`putFile` (the GitHub Content API client).
+`_annotate`), `fetchFile`/`putFile`/`FetchFileResult`/`PutFileResult` (the
+GitHub Content API client), and `slugify` (matching `generator`'s own
+`TargetStore._slugify`).

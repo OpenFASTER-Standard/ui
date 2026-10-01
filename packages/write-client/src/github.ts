@@ -3,13 +3,13 @@
 // that same sha back to update an existing file, and returns
 // {commit: {sha}} for the new commit.
 
-type FetchFileResult =
+export type FetchFileResult =
   | { status: "ok"; content: string; sha: string }
   | { status: "not-found" }
   | { status: "auth-failed" }
   | { status: "network-error" }
 
-type PutFileResult =
+export type PutFileResult =
   | { status: "ok"; commitSha: string }
   | { status: "conflict" }
   | { status: "auth-failed" }
