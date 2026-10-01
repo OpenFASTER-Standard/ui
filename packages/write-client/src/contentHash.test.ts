@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs"
+import path from "node:path"
 import { describe, expect, it } from "vitest"
 import { computeContentHash } from "./contentHash"
 
@@ -14,7 +15,7 @@ async function sha256Hex(text: string): Promise<string> {
 describe("computeContentHash", () => {
   it("matches lxml's real inclusive C14N hash for an element under three unrelated ancestor namespaces", async () => {
     const xml = readFileSync(
-      "/work/ontologies/mikadiv-fm/sources/1.02/xsd/MiKaDiv_FM_Meldeart23_1.02.xsd",
+      path.join(import.meta.dirname, "__fixtures__/MiKaDiv_FM_Meldeart23_1.02.xsd"),
       "utf8",
     )
     const doc = parse(xml)
