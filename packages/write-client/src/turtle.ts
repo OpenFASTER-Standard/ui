@@ -12,13 +12,27 @@ export type CitationEdit = {
   contentHash: string
 }
 
-// Mirrors generator/annotation_model/rdf.py's clear_property_shape: find
-// propertyShapeIri's own prov:wasDerivedFrom annotation, remove that
-// annotation's target(s)/selector(s) and the annotation itself, then the
-// property shape's own triples -- but never anything where
-// propertyShapeIri is only the OBJECT (the node shape's own sh:property
-// link must survive, exactly like the Python original's docstring: "never
-// touches the node shape itself").
+// Mirrors generator/annotation_model/rdf.py's clear_property_shape for
+// the annotation/target/selector chain: find propertyShapeIri's own
+// prov:wasDerivedFrom annotation, remove that annotation's
+// target(s)/selector(s) and the annotation itself.
+//
+// Final-review Critical#3: unlike clear_property_shape's own blanket
+// `graph.remove((property_shape_iri, None, None))`, this only removes
+// the citation-owned predicates on the property shape itself, not every
+// triple with it as subject. generator's own annotate_display_hint()
+// asserts sh:name/sh:order/dash:editor on this same subject -- its
+// module docstring says clear_property_shape is "deliberately NOT reused
+// here" for exactly this reason. The full Python regeneration pipeline
+// gets away with the blanket removal because it always re-runs
+// annotate_display_hint() immediately after annotate_xpath() in the same
+// pass; this write client's own commitReCitation never re-applies hints,
+// so reusing that same blanket behavior here would silently and
+// permanently erase them on every re-citation. The node shape's own
+// sh:property link (propertyShapeIri as OBJECT, not subject) was never
+// touched by the Python original either and still isn't here.
+const CITATION_OWNED_PREDICATES = [RDF_NS + "type", SH_NS + "path", PROV_NS + "wasDerivedFrom", GEN_NS + "contentHash"]
+
 function clearPropertyShape(store: Store, propertyShapeIri: ReturnType<typeof namedNode>): void {
   const annotationQuads = store.getQuads(propertyShapeIri, namedNode(PROV_NS + "wasDerivedFrom"), null, null)
   for (const annotationQuad of annotationQuads) {
@@ -32,7 +46,9 @@ function clearPropertyShape(store: Store, propertyShapeIri: ReturnType<typeof na
     }
     store.removeQuads(store.getQuads(annotationIri, null, null, null))
   }
-  store.removeQuads(store.getQuads(propertyShapeIri, null, null, null))
+  for (const predicate of CITATION_OWNED_PREDICATES) {
+    store.removeQuads(store.getQuads(propertyShapeIri, namedNode(predicate), null, null))
+  }
 }
 
 export function upsertCitation(existingTurtle: string, edit: CitationEdit): string {

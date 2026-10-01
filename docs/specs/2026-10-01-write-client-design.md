@@ -173,11 +173,24 @@ type CitationEdit = {
 ```
 
 Parses `existingTurtle` via `n3`'s `Parser` into a `Store`, mirrors
-`clear_property_shape`'s exact removal (looks up the property shape's own
-`prov:wasDerivedFrom` annotation, that annotation's `oa:hasTarget`
-target(s) and their `oa:hasSelector` selector(s), removes all of their
-triples plus the property shape's own, in that order), adds the
-replacement triples using the identical IRI-minting scheme
+`clear_property_shape`'s own annotation/target/selector removal (looks up
+the property shape's own `prov:wasDerivedFrom` annotation, that
+annotation's `oa:hasTarget` target(s) and their `oa:hasSelector`
+selector(s), removes all of their triples), then removes only the
+citation-owned predicates on the property shape itself (`rdf:type`,
+`sh:path`, `prov:wasDerivedFrom`, `gen:contentHash`) — **deliberately not**
+`clear_property_shape`'s own blanket removal of every triple with the
+property shape as subject. Found live during this task's own final
+review: `annotation_model.hints.annotate_display_hint` asserts
+`sh:name`/`sh:order`/`dash:editor` on that same subject, and its own
+module docstring already explains why `clear_property_shape` is
+"deliberately NOT reused" for hints — the full Python regeneration
+pipeline gets away with the blanket removal because it always re-runs
+`annotate_display_hint` immediately after `annotate_xpath` in the same
+pass. This write client's `commitReCitation` never re-applies hints, so a
+literal mirror would silently and permanently erase them on every
+re-citation. Adds the replacement triples using the identical IRI-minting
+scheme
 `annotation_model.rdf`'s `_annotate()` uses (`GEN[standard/shapeName]`,
 `GEN[standard/shapeName/propertyName]`, `.../path`, `.../annotation`,
 percent-encoding each segment independently — reusing the exact same
