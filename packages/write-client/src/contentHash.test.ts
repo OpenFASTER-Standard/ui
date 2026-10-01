@@ -145,4 +145,31 @@ describe("computeContentHash", () => {
       "sha256:bb109ab01928637eac584eb96812357e7ad7635c51d11a044a41a0960eb85c62",
     )
   })
+
+  // Final-review Minor#16: C14N requires a literal CR in an attribute
+  // value to be escaped as &#xD; (XML's own line-ending normalization
+  // would otherwise silently fold it away).
+  it("escapes a literal carriage return in an attribute value as &#xD; (M16)", async () => {
+    const doc = parse(
+      `<?xml version="1.0"?><xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"><xs:element name="a&#13;b"/></xs:schema>`,
+    )
+    const el = doc.getElementsByTagNameNS("http://www.w3.org/2001/XMLSchema", "element")[0]
+    expect(el.getAttribute("name")).toBe("a\rb")
+    expect(await computeContentHash(el)).toBe(
+      "sha256:2ed2f999f09f5f6df3329e9697c08622c6ae9d99cdf846a216a30b16258fe070",
+    )
+  })
+
+  // Final-review Minor#17: an explicit xmlns="" undeclaration on an
+  // ancestor is a no-op for a standalone, detached serialization -- there
+  // is no ambient default namespace to undeclare in the first place.
+  it("omits an empty-default-namespace undeclaration rather than emitting xmlns=\"\" (M17)", async () => {
+    const doc = parse(
+      `<?xml version="1.0"?><outer xmlns="http://example.com/ns"><inner xmlns=""><leaf>hi</leaf></inner></outer>`,
+    )
+    const inner = doc.getElementsByTagName("inner")[0]
+    expect(await computeContentHash(inner)).toBe(
+      "sha256:72e10d3f62fa4d3e5f8e4c166a9c556a9729cbb2df5f7b83c386c775434c1991",
+    )
+  })
 })
