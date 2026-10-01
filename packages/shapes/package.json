@@ -1,6 +1,6 @@
 {
   "name": "@openfaster-standard/shapes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenFASTER's shape-rendering engine -- React components that render SHACL shapes as UI, built on @openfaster-standard/ui.",
   "type": "module",
   "license": "MIT",
