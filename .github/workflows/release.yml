@@ -52,6 +52,11 @@ jobs:
       - run: pnpm --filter @openfaster-standard/shapes exec tsc --noEmit
       - run: pnpm --filter @openfaster-standard/shapes build
       - run: pnpm --filter @openfaster-standard/shapes test
+      # @openfaster-standard/write-client depends on @openfaster-standard/shapes'
+      # built dist/ -- these steps run after the shapes build above.
+      - run: pnpm --filter @openfaster-standard/write-client exec tsc --noEmit
+      - run: pnpm --filter @openfaster-standard/write-client build
+      - run: pnpm --filter @openfaster-standard/write-client test
       - uses: changesets/action@v1
         with:
           # `-r publish` walks every workspace package with a version bump
