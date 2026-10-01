@@ -48,6 +48,33 @@ describe("dist/ integrity (real built output, not source claims)", () => {
     expect(themeCss).not.toContain(".animate-pulse")
   })
 
+  it("every package theme.css @imports is a real dependency, not devDependency-only", () => {
+    // theme.css is published for an EXTERNAL consumer's own Tailwind build
+    // to process -- a package only this package's own devDependencies
+    // satisfy (tw-animate-css, shadcn, @fontsource-variable/geist) would
+    // resolve fine inside this repo's own tests/build but fail for any
+    // real external consumer, who only gets this package's `dependencies`
+    // installed transitively, never its devDependencies. Confirmed live
+    // during workspace-auth's own consumption of this file: the build
+    // failed outright with "Can't resolve 'tw-animate-css'" until these
+    // were real dependencies.
+    const themeCss = readFileSync(path.join(DIST, "theme.css"), "utf-8")
+    const packageJson = JSON.parse(readFileSync(path.join(PACKAGE_ROOT, "package.json"), "utf-8"))
+    const importedPackages = [...themeCss.matchAll(/@import\s+"([^"./][^"]*)"/g)]
+      .map((m) => {
+        const spec = m[1]
+        // Strip a subpath (e.g. "shadcn/tailwind.css" -> "shadcn"), keeping
+        // the scope segment for a scoped package (e.g. "@a/b/c" -> "@a/b").
+        const segments = spec.split("/")
+        return spec.startsWith("@") ? segments.slice(0, 2).join("/") : segments[0]
+      })
+      .filter((spec) => spec !== "tailwindcss")
+    expect(importedPackages.length).toBeGreaterThan(0)
+    for (const spec of importedPackages) {
+      expect(Object.keys(packageJson.dependencies), `${spec}: must be a real dependency, not devDependency-only`).toContain(spec)
+    }
+  })
+
   it("exports ./theme.css in package.json, pointing at the real file in dist/", () => {
     const packageJson = JSON.parse(readFileSync(path.join(PACKAGE_ROOT, "package.json"), "utf-8"))
     expect(packageJson.exports["./theme.css"]).toBe("./dist/theme.css")
