@@ -1,4 +1,5 @@
 import { DataFactory, Parser, Store, Writer } from "n3"
+import type { Quad, Quad_Object, Term } from "n3"
 import { GEN_NS, OA_NS, PROV_NS, RDF_NS, SH_NS } from "@openfaster-standard/shapes"
 
 const { namedNode, blankNode, literal } = DataFactory
@@ -87,10 +88,66 @@ export function upsertCitation(existingTurtle: string, edit: CitationEdit): stri
   store.addQuad(selector, namedNode(RDF_NS + "type"), namedNode(OA_NS + "XPathSelector"))
   store.addQuad(selector, namedNode(RDF_NS + "value"), literal(edit.newXPath))
 
-  const writer = new Writer({
-    prefixes: { sh: SH_NS, gen: GEN_NS, prov: PROV_NS, oa: OA_NS, rdf: RDF_NS },
+  return serializeNested(store.getQuads(null, null, null, null), {
+    sh: SH_NS,
+    gen: GEN_NS,
+    prov: PROV_NS,
+    oa: OA_NS,
+    rdf: RDF_NS,
   })
-  writer.addQuads(store.getQuads(null, null, null, null))
+}
+
+// Final-review Important#11: n3's Writer emits every blank node as a
+// separate, randomly-labeled top-level block by default. generator's own
+// rdflib serializer nests a blank node referenced exactly once inline as
+// a `[ ... ]` block instead (verified live against the same graph shape)
+// -- every annotation/target/selector chain this module ever produces or
+// leaves untouched is exactly this shape (each blank node referenced by
+// exactly one other triple). Re-citing one property shape must not
+// reformat every OTHER citation's blank-node layout in the same file --
+// the diff is the review artifact on a maker-checker provenance platform.
+function serializeNested(quads: Quad[], prefixes: Record<string, string>): string {
+  const writer = new Writer({ prefixes })
+
+  const objectOccurrences = new Map<string, number>()
+  for (const quad of quads) {
+    if (quad.object.termType === "BlankNode") {
+      objectOccurrences.set(quad.object.value, (objectOccurrences.get(quad.object.value) ?? 0) + 1)
+    }
+  }
+  // Only a blank node referenced exactly once as an object is safe to
+  // inline -- one referenced zero or multiple times has no single place
+  // to nest it, and must stay a flat, explicitly-shared top-level block.
+  const inlineCandidates = new Set(
+    Array.from(objectOccurrences.entries())
+      .filter(([, count]) => count === 1)
+      .map(([blankNodeId]) => blankNodeId),
+  )
+
+  const quadsBySubject = new Map<string, Quad[]>()
+  for (const quad of quads) {
+    if (quad.subject.termType !== "BlankNode") continue
+    const key = quad.subject.value
+    if (!quadsBySubject.has(key)) quadsBySubject.set(key, [])
+    quadsBySubject.get(key)!.push(quad)
+  }
+
+  function termFor(term: Quad_Object): Quad_Object {
+    if (term.termType === "BlankNode" && inlineCandidates.has(term.value)) {
+      const ownQuads = quadsBySubject.get(term.value) ?? []
+      return writer.blank(ownQuads.map((q) => ({ predicate: q.predicate, object: termFor(q.object) })))
+    }
+    return term
+  }
+
+  for (const quad of quads) {
+    // A quad whose SUBJECT is an inline candidate gets emitted nested,
+    // under whichever other quad references it as an object -- never
+    // also as a separate top-level quad.
+    if (quad.subject.termType === "BlankNode" && inlineCandidates.has((quad.subject as Term).value)) continue
+    writer.addQuad(quad.subject, quad.predicate, termFor(quad.object))
+  }
+
   let result = ""
   writer.end((error, turtle) => {
     if (error) throw error

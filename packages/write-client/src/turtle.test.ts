@@ -147,4 +147,54 @@ _:selector a oa:XPathSelector ;
       "sha256:new",
     )
   })
+
+  // Final-review Important#11: n3's Writer emits every blank node as a
+  // separate, randomly-labeled top-level block (_:n3-0, _:n3-1, ...) by
+  // default -- generator's own rdflib serializer nests a blank node
+  // referenced exactly once inline as a `[ ... ]` block instead (verified
+  // live against the same graph shape). Re-citing one property shape
+  // should not reformat every OTHER citation's blank-node layout in the
+  // same file -- the git diff is the review artifact on a maker-checker
+  // provenance platform.
+  it("nests each annotation's target/selector as inline [ ... ] blocks, not flat top-level blank-node references", () => {
+    const result = upsertCitation(EXISTING_TURTLE, EDIT)
+    expect(result).not.toMatch(/_:\S+/)
+    expect(result).toContain("oa:hasTarget [")
+    expect(result).toContain("oa:hasSelector [")
+  })
+
+  it("keeps the untouched sibling property shape's own citation nested too, not just the edited one", () => {
+    const result = upsertCitation(EXISTING_TURTLE, EDIT)
+    const store = storeFrom(result)
+    const other = namedNode(`${GEN_NS}MiKaDiv_FM/Meldeart23/Other`)
+    const annotation = store.getQuads(other, namedNode(`${PROV_NS}wasDerivedFrom`), null, null)[0].object
+    const target = store.getQuads(annotation, namedNode(`${OA_NS}hasTarget`), null, null)[0].object
+    expect(target.termType).toBe("BlankNode")
+    // Re-parsing proves the nested form round-trips to the identical
+    // graph shape -- this is a formatting change, not a semantic one.
+    expect(
+      store.getQuads(target, namedNode(`${OA_NS}hasSource`), null, null)[0].object.value,
+    ).toBe("file:///work/ontologies/mikadiv-fm/sources/1.02/xsd/MiKaDiv_FM_Meldeart23_1.02.xsd")
+  })
+
+  it("does not inline a blank node referenced more than once (safe fallback)", () => {
+    const sharedBlankNodeTurtle = `
+@prefix sh: <${SH_NS}> .
+@prefix gen: <${GEN_NS}> .
+<${GEN_NS}A/B> a sh:NodeShape ;
+  sh:property <${GEN_NS}A/B/C> ;
+  sh:property <${GEN_NS}A/B/D> .
+<${GEN_NS}A/B/C> sh:node _:shared .
+<${GEN_NS}A/B/D> sh:node _:shared .
+_:shared sh:name "shared" .
+`
+    const result = upsertCitation(sharedBlankNodeTurtle, { ...EDIT, standard: "A", shapeName: "B", propertyName: "C" })
+    const store = storeFrom(result)
+    // Still two real references to the same shared blank node, and its
+    // own triple survives -- not silently dropped or duplicated.
+    const sharedQuads = store.getQuads(null, namedNode(`${SH_NS}node`), null, null)
+    expect(sharedQuads).toHaveLength(2)
+    expect(sharedQuads[0].object.value).toBe(sharedQuads[1].object.value)
+    expect(store.getQuads(sharedQuads[0].object, namedNode(`${SH_NS}name`), null, null)[0].object.value).toBe("shared")
+  })
 })
