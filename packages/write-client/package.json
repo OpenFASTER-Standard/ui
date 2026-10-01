@@ -1,0 +1,49 @@
+{
+  "name": "@openfaster-standard/write-client",
+  "version": "0.1.0",
+  "description": "OpenFASTER's write client -- commits a re-citation (a corrected XPath selector on an existing SHACL property shape) via GitHub's Content API, client-side, no backend.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenFASTER-Standard/ui.git",
+    "directory": "packages/write-client"
+  },
+  "homepage": "https://github.com/OpenFASTER-Standard/ui",
+  "bugs": "https://github.com/OpenFASTER-Standard/ui/issues",
+  "keywords": ["openfaster", "rdf", "shacl", "github", "citation"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist && tsup",
+    "prepublishOnly": "pnpm build",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "@openfaster-standard/shapes": "workspace:*",
+    "n3": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/n3": "^1.26.4",
+    "@types/node": "^26.6.3",
+    "jsdom": "^30.1.1",
+    "oxlint": "^1.81.0",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}
