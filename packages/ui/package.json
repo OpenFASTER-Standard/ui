@@ -26,10 +26,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": "./dist/style.css",
+    "./theme.css": "./dist/theme.css"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist && tsup && tailwindcss -i ./src/index.css -o ./dist/style.css --minify && node scripts/copy-fonts.mjs",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist && tsup && tailwindcss -i ./src/index.css -o ./dist/style.css --minify && cp ./src/index.css ./dist/theme.css && node scripts/copy-fonts.mjs",
     "prepublishOnly": "pnpm build",
     "dev": "tsup --watch",
     "test": "vitest run",

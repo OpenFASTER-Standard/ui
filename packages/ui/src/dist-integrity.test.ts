@@ -25,6 +25,35 @@ const REPRESENTATIVE_CLASSES = [
 ]
 
 describe("dist/ integrity (real built output, not source claims)", () => {
+  it("publishes theme.css as a raw, re-compilable Tailwind source -- not pre-generated utility output", () => {
+    // style.css is dist/'s own compiled output, Tailwind-scanned against
+    // only this package's own src/ -- a real, already-confirmed gap for
+    // any consuming app: a utility class written in the CONSUMER's own
+    // source (e.g. "max-w-2xl" in workspace-auth's App.tsx) was never seen
+    // by this build, so it silently has zero effect, no error, nothing in
+    // style.css at all. theme.css is this package's real src/index.css
+    // (the @import "tailwindcss" + @theme + :root/.dark variable
+    // definitions, no component-specific utility usage) -- a consumer runs
+    // ITS OWN Tailwind build over it, scanning its OWN source, and gets
+    // real utility classes for whatever it writes, using this package's
+    // real design tokens.
+    const themeCss = readFileSync(path.join(DIST, "theme.css"), "utf-8")
+    expect(themeCss).toContain('@import "tailwindcss"')
+    expect(themeCss).toContain("@theme")
+    expect(themeCss).toContain("--color-primary")
+    // A raw theme source, not compiled utility output -- these specific
+    // component classes must be ABSENT (if present, this is accidentally
+    // dist/style.css under a new name, not the re-compilable source).
+    expect(themeCss).not.toContain(".bg-primary")
+    expect(themeCss).not.toContain(".animate-pulse")
+  })
+
+  it("exports ./theme.css in package.json, pointing at the real file in dist/", () => {
+    const packageJson = JSON.parse(readFileSync(path.join(PACKAGE_ROOT, "package.json"), "utf-8"))
+    expect(packageJson.exports["./theme.css"]).toBe("./dist/theme.css")
+    expect(existsSync(path.join(PACKAGE_ROOT, packageJson.exports["./theme.css"]))).toBe(true)
+  })
+
   it("style.css contains every representative compiled class real components use", () => {
     const css = readFileSync(path.join(DIST, "style.css"), "utf-8")
     for (const className of REPRESENTATIVE_CLASSES) {
