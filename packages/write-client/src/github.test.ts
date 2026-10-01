@@ -34,6 +34,43 @@ describe("fetchFile", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")))
     expect(await fetchFile("o", "r", "p", "main", "tok")).toEqual({ status: "network-error" })
   })
+
+  // Final-review Critical#4: atob yields a byte-per-char Latin1 string --
+  // this corpus is German tax reporting, every shape file's own sh:name
+  // labels derive from XSD documentation full of umlauts and "§", and
+  // every untouched sibling property shape in a file passes through this
+  // same decode path on every single commit.
+  it("correctly decodes non-ASCII UTF-8 content, not mojibake (C4)", async () => {
+    const original = 'sh:name "Natürliche Person § 45c – ÄÖÜ" .'
+    const encoded = Buffer.from(original, "utf8").toString("base64")
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200, json: () => Promise.resolve({ content: encoded, sha: "abc123" }) }))
+    const result = await fetchFile("o", "r", "p", "main", "tok")
+    expect(result).toEqual({ status: "ok", content: original, sha: "abc123" })
+  })
+
+  // Final-review Important#7: GitHub's real API returns 500/502/503 and a
+  // 429 secondary-rate-limit response in the ordinary course of
+  // operation -- these must not escape as a raw TypeError/SyntaxError
+  // from a failed body parse.
+  it("returns network-error for an unrecognized status instead of throwing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 500, json: () => Promise.resolve({}) }))
+    expect(await fetchFile("o", "r", "p", "main", "tok")).toEqual({ status: "network-error" })
+  })
+
+  it("returns network-error when the response body isn't valid JSON, instead of throwing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200, json: () => Promise.reject(new SyntaxError("Unexpected token <")) }))
+    expect(await fetchFile("o", "r", "p", "main", "tok")).toEqual({ status: "network-error" })
+  })
+
+  // Final-review Minor#20: an unencoded path/branch segment can silently
+  // change the request's meaning (e.g. a branch name containing "#").
+  it("percent-encodes the branch and each path segment in the request URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, json: () => Promise.resolve({ content: "", sha: "s" }) })
+    vi.stubGlobal("fetch", fetchMock)
+    await fetchFile("o", "r", "shapes/a b.ttl", "feature#1", "tok")
+    const [url] = fetchMock.mock.calls[0]
+    expect(url).toBe("https://api.github.com/repos/o/r/contents/shapes/a%20b.ttl?ref=feature%231")
+  })
 })
 
 describe("putFile", () => {
@@ -66,5 +103,46 @@ describe("putFile", () => {
     expect(await putFile("o", "r", "p", "main", "tok", { content: "c", sha: "s", message: "m" })).toEqual({
       status: "network-error",
     })
+  })
+
+  // Final-review Important#7: GitHub documents 422 alongside 409 for some
+  // stale/invalid-sha rejections on this endpoint.
+  it("returns conflict for a 422", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 422, json: () => Promise.resolve({}) }))
+    expect(await putFile("o", "r", "p", "main", "tok", { content: "c", sha: "s", message: "m" })).toEqual({
+      status: "conflict",
+    })
+  })
+
+  it("returns network-error for an unrecognized status instead of throwing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 500, json: () => Promise.resolve({}) }))
+    expect(await putFile("o", "r", "p", "main", "tok", { content: "c", sha: "s", message: "m" })).toEqual({
+      status: "network-error",
+    })
+  })
+
+  // Final-review Critical#4/Minor#21: the encode side must round-trip
+  // correctly with fetchFile's own decode, using the non-deprecated
+  // TextEncoder-based idiom instead of the Annex-B `unescape` function.
+  it("correctly encodes non-ASCII UTF-8 content in the request body", async () => {
+    const original = 'sh:name "Natürliche Person § 45c – ÄÖÜ" .'
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, json: () => Promise.resolve({ commit: { sha: "s" } }) })
+    vi.stubGlobal("fetch", fetchMock)
+    await putFile("o", "r", "p", "main", "tok", { content: original, sha: "s", message: "m" })
+    const [, init] = fetchMock.mock.calls[0]
+    const sentBase64 = (JSON.parse(init.body as string) as { content: string }).content
+    expect(Buffer.from(sentBase64, "base64").toString("utf8")).toBe(original)
+  })
+
+  // Final-review Minor#20. putFile's own `branch` goes in the JSON body,
+  // not the URL (no `?ref=` on a PUT), so only the path needs encoding
+  // here -- JSON.stringify already handles the body's branch string safely.
+  it("percent-encodes each path segment in the request URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, json: () => Promise.resolve({ commit: { sha: "s" } }) })
+    vi.stubGlobal("fetch", fetchMock)
+    await putFile("o", "r", "shapes/a b.ttl", "feature#1", "tok", { content: "c", sha: "s", message: "m" })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe("https://api.github.com/repos/o/r/contents/shapes/a%20b.ttl")
+    expect((JSON.parse(init.body as string) as { branch: string }).branch).toBe("feature#1")
   })
 })
