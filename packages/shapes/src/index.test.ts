@@ -23,4 +23,12 @@ describe("package public surface", () => {
     expect(typeof shapes.fetchSourceDocument).toBe("function")
     expect(typeof shapes.evaluateXPathAgainstDocument).toBe("function")
   })
+
+  // write-client's final review (Minor#15) found it had hand-copied this
+  // resolver's own logic rather than reusing it, risking silent
+  // divergence from whatever evaluateXPathAgainstDocument itself uses --
+  // exporting it here is the fix.
+  it("exports documentNamespaceResolver for consumers that need the real Element a resolved XPath matched", () => {
+    expect(typeof shapes.documentNamespaceResolver).toBe("function")
+  })
 })

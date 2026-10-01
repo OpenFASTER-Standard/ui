@@ -23,6 +23,7 @@ export {
   findCitation,
   fetchSourceDocument,
   evaluateXPathAgainstDocument,
+  documentNamespaceResolver,
   displayTextFor,
   RESOLVED_VALUE_STATUS_TEXT,
   LOADING_TEXT,
