@@ -116,7 +116,10 @@ in a new package `packages/write-client` in this same pnpm workspace
 tooling rather than standing up a new repo. No dependency on React; `n3`
 is the only RDF dependency, matching `packages/shapes`' own choice.
 
-**`computeContentHash(element: Element): string`**
+**`computeContentHash(element: Element): Promise<string>`** — async, since
+`crypto.subtle.digest()` has no synchronous form in either a real browser
+or Node's own `webcrypto` (a deliberate Web Crypto API design choice, not
+a Node-specific limitation) —
 (`packages/write-client/src/contentHash.ts`) — `"sha256:" + hex`, where
 `hex` is SHA-256 of this element's own real inclusive-C14N byte
 serialization:
@@ -217,7 +220,7 @@ type CommitResult =
    `{status: "resolution-failed", reason}` **before any network write at
    all** — a citation that doesn't currently resolve must never be
    committed.
-2. Computes `computeContentHash` on the freshly-resolved element.
+2. Awaits `computeContentHash` on the freshly-resolved element.
 3. `fetchFile` for the target shape path (mirroring
    `TargetStore._shape_path`'s own `shapes/<slugify(standard)>/<slugify(shapeName)>.ttl`
    layout, reimplemented against the same slugify rule —
