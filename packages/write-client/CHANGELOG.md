@@ -1,5 +1,11 @@
 # @openfaster-standard/write-client
 
+## 0.2.1
+
+### Patch Changes
+
+- @openfaster-standard/shapes@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes
