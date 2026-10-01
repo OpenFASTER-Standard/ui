@@ -1,6 +1,6 @@
 {
   "name": "@openfaster-standard/write-client",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "OpenFASTER's write client -- commits a re-citation (a corrected XPath selector on an existing SHACL property shape) via GitHub's Content API, client-side, no backend.",
   "type": "module",
   "license": "MIT",
