@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { parseShapeGraph } from "./parse"
-import { displayTextFor, resolveCitedValue } from "./resolve"
+import { displayTextFor, evaluateXPathAgainstDocument, fetchSourceDocument, findCitation, resolveCitedValue } from "./resolve"
 
 const REAL_DOCUMENTATION_TEXT = "Meldung nach § 45c Absatz 2 Satz 3 EStG."
 
@@ -243,6 +243,135 @@ _:selector a oa:XPathSelector .
     const result = await resolveCitedValue(graph, "https://openfaster.org/ns/generator#S/Sh/NoValue", (u) => u)
 
     expect(result).toEqual({ status: "malformed-citation" })
+  })
+})
+
+describe("findCitation", () => {
+  it("returns found with the real sourceUri and xpath for a complete citation", () => {
+    const graph = shapeGraphWithCitation("/xs:schema")
+    expect(findCitation(graph, "https://openfaster.org/ns/generator#S/Sh/Doc")).toEqual({
+      status: "found",
+      sourceUri: "file:///work/ontologies/mikadiv-fm/sources/1.02/xsd/MiKaDiv_FM_Meldeart23_1.02.xsd",
+      xpath: "/xs:schema",
+    })
+  })
+
+  it("returns fetch-failed for a citation with no oa:hasSource at all", () => {
+    const graph = parseShapeGraph(`
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<https://openfaster.org/ns/generator#S/Sh/Broken> a sh:PropertyShape ;
+  prov:wasDerivedFrom <https://openfaster.org/ns/generator#S/Sh/Broken/annotation> .
+<https://openfaster.org/ns/generator#S/Sh/Broken/annotation> oa:hasTarget _:target .
+_:target oa:hasSelector _:selector .
+_:selector a oa:XPathSelector ;
+  rdf:value "/xs:schema" .
+`)
+    expect(findCitation(graph, "https://openfaster.org/ns/generator#S/Sh/Broken")).toEqual({ status: "fetch-failed" })
+  })
+
+  it("returns malformed-citation for a selector with no rdf:type at all", () => {
+    const graph = parseShapeGraph(`
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<https://openfaster.org/ns/generator#S/Sh/NoType> a sh:PropertyShape ;
+  prov:wasDerivedFrom <https://openfaster.org/ns/generator#S/Sh/NoType/annotation> .
+<https://openfaster.org/ns/generator#S/Sh/NoType/annotation> oa:hasTarget _:target .
+_:target oa:hasSource <file:///work/ontologies/mikadiv-fm/sources/1.02/xsd/MiKaDiv_FM_Meldeart23_1.02.xsd> ;
+  oa:hasSelector _:selector .
+_:selector rdf:value "/xs:schema" .
+`)
+    expect(findCitation(graph, "https://openfaster.org/ns/generator#S/Sh/NoType")).toEqual({
+      status: "malformed-citation",
+    })
+  })
+
+  it("returns unsupported-selector-type for a non-XPathSelector", () => {
+    const graph = shapeGraphWithCitation("<svg:polygon .../>", "SvgSelector")
+    expect(findCitation(graph, "https://openfaster.org/ns/generator#S/Sh/Doc")).toEqual({
+      status: "unsupported-selector-type",
+    })
+  })
+})
+
+describe("fetchSourceDocument", () => {
+  it("returns ok with a parsed Document for a successful fetch", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(REAL_FIXTURE_XML) }))
+    const result = await fetchSourceDocument("file:///whatever.xsd", (u) => u)
+    expect(result.status).toBe("ok")
+    if (result.status === "ok") {
+      expect(result.doc.documentElement.tagName).toBe("xs:schema")
+    }
+  })
+
+  it("returns fetch-failed for a rejected fetch", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")))
+    expect(await fetchSourceDocument("file:///whatever.xsd", (u) => u)).toEqual({ status: "fetch-failed" })
+  })
+
+  it("returns fetch-failed for a non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, text: () => Promise.resolve("") }))
+    expect(await fetchSourceDocument("file:///whatever.xsd", (u) => u)).toEqual({ status: "fetch-failed" })
+  })
+
+  it("returns fetch-failed when reading the response body fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.reject(new Error("body stream aborted")) }),
+    )
+    expect(await fetchSourceDocument("file:///whatever.xsd", (u) => u)).toEqual({ status: "fetch-failed" })
+  })
+
+  it("returns fetch-failed for a response body that isn't XML at all (a real <parsererror>)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve("Not valid XML at all <<<") }))
+    expect(await fetchSourceDocument("file:///whatever.xsd", (u) => u)).toEqual({ status: "fetch-failed" })
+  })
+})
+
+describe("evaluateXPathAgainstDocument", () => {
+  it("returns resolved with the real text for a matching XPath", () => {
+    const doc = new DOMParser().parseFromString(REAL_FIXTURE_XML, "text/xml")
+    expect(
+      evaluateXPathAgainstDocument(doc, "/xs:schema/xs:complexType[@name='Meldeart23']/xs:annotation/xs:documentation"),
+    ).toEqual({ status: "resolved", value: REAL_DOCUMENTATION_TEXT })
+  })
+
+  it("returns not-found for an XPath with zero matches", () => {
+    const doc = new DOMParser().parseFromString(REAL_FIXTURE_XML, "text/xml")
+    expect(evaluateXPathAgainstDocument(doc, "/xs:schema/xs:complexType[@name='DoesNotExist']")).toEqual({
+      status: "not-found",
+    })
+  })
+
+  it("returns ambiguous for an XPath matching more than one element", () => {
+    const multiMatchXml = `<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="a"/>
+  <xs:element name="b"/>
+</xs:schema>`
+    const doc = new DOMParser().parseFromString(multiMatchXml, "text/xml")
+    expect(evaluateXPathAgainstDocument(doc, "/xs:schema/xs:element")).toEqual({ status: "ambiguous" })
+  })
+
+  it("returns uncitable for an attribute-returning XPath", () => {
+    const doc = new DOMParser().parseFromString(`<root a="val"/>`, "text/xml")
+    expect(evaluateXPathAgainstDocument(doc, "/root/@a")).toEqual({ status: "uncitable" })
+  })
+
+  it("returns uncitable for a string()-typed XPath", () => {
+    const doc = new DOMParser().parseFromString(REAL_FIXTURE_XML, "text/xml")
+    expect(evaluateXPathAgainstDocument(doc, "string(/xs:schema/xs:complexType/@name)")).toEqual({
+      status: "uncitable",
+    })
+  })
+
+  it("returns uncitable for a syntactically invalid XPath, not a crash", () => {
+    const doc = new DOMParser().parseFromString(REAL_FIXTURE_XML, "text/xml")
+    expect(evaluateXPathAgainstDocument(doc, "/xs:schema[[[not valid")).toEqual({ status: "uncitable" })
   })
 })
 

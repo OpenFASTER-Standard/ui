@@ -12,6 +12,12 @@ export type ResolvedValue =
   | { status: "ambiguous" }
   | { status: "uncitable" }
 
+export type Citation =
+  | { status: "found"; sourceUri: string; xpath: string }
+  | { status: "malformed-citation" }
+  | { status: "unsupported-selector-type" }
+  | { status: "fetch-failed" }
+
 const XPATH_NAMESPACES: Record<string, string> = { xs: "http://www.w3.org/2001/XMLSchema" }
 
 export const LOADING_TEXT = "Resolving…"
@@ -29,19 +35,15 @@ export function displayTextFor(result: ResolvedValue): string {
   return result.status === "resolved" ? result.value : RESOLVED_VALUE_STATUS_TEXT[result.status]
 }
 
-export async function resolveCitedValue(
-  graph: ShapeGraph,
-  propertyShapeIri: string,
-  resolveSourceUri: (fileUri: string) => string,
-): Promise<ResolvedValue> {
-  // Mirrors generator/annotation_model/drift.py's _selector_link(): walk
-  // property shape -> prov:wasDerivedFrom -> annotation -> oa:hasTarget ->
-  // target -> oa:hasSelector -> selector, and target -> oa:hasSource. A
-  // missing link up through oa:hasSource/oa:hasSelector means there is
-  // nothing real to fetch -- the spec's own sanctioned "fetch-failed"
-  // collapse. A *present* selector missing its own rdf:type/rdf:value is a
-  // narrower, different problem (a genuinely incomplete citation, not an
-  // absent one) -- see "malformed-citation" below.
+// Mirrors generator/annotation_model/drift.py's _selector_link(): walk
+// property shape -> prov:wasDerivedFrom -> annotation -> oa:hasTarget ->
+// target -> oa:hasSelector -> selector, and target -> oa:hasSource. A
+// missing link up through oa:hasSource/oa:hasSelector means there is
+// nothing real to fetch -- the spec's own sanctioned "fetch-failed"
+// collapse. A *present* selector missing its own rdf:type/rdf:value is a
+// narrower, different problem (a genuinely incomplete citation, not an
+// absent one) -- see "malformed-citation" below.
+export function findCitation(graph: ShapeGraph, propertyShapeIri: string): Citation {
   const subject = subjectTermFor(propertyShapeIri)
 
   const annotationQuad = pickDeterministic(
@@ -73,9 +75,13 @@ export async function resolveCitedValue(
   const xpathQuad = pickDeterministic(graph.store.getQuads(selectorQuad.object, namedNode(RDF_NS + "value"), null, null))
   if (!xpathQuad) return { status: "malformed-citation" }
 
-  const sourceUri = sourceQuad.object.value
-  const xpath = xpathQuad.object.value
+  return { status: "found", sourceUri: sourceQuad.object.value, xpath: xpathQuad.object.value }
+}
 
+export async function fetchSourceDocument(
+  sourceUri: string,
+  resolveSourceUri: (fileUri: string) => string,
+): Promise<{ status: "ok"; doc: Document } | { status: "fetch-failed" }> {
   let text: string
   try {
     const response = await fetch(resolveSourceUri(sourceUri))
@@ -85,16 +91,20 @@ export async function resolveCitedValue(
     return { status: "fetch-failed" }
   }
 
-  try {
-    const doc = new DOMParser().parseFromString(text, "text/xml")
-    // Verified live: jsdom's (and a real browser's) DOMParser never
-    // throws for malformed XML -- it returns a document whose root is a
-    // <parsererror> element instead. Well-formed-but-wrong content (e.g.
-    // an HTML error page, which usually happens to also be well-formed
-    // XML) does NOT hit this -- that's correctly "not-found" below, the
-    // same as Python's own resolve_xpath() treats it.
-    if (doc.documentElement?.tagName === "parsererror") return { status: "fetch-failed" }
+  const doc = new DOMParser().parseFromString(text, "text/xml")
+  // Verified live: jsdom's (and a real browser's) DOMParser never throws
+  // for malformed XML -- it returns a document whose root is a
+  // <parsererror> element instead. Well-formed-but-wrong content (e.g. an
+  // HTML error page, which usually happens to also be well-formed XML)
+  // does NOT hit this -- that correctly stays "not-found" once evaluated,
+  // the same as Python's own resolve_xpath() treats it.
+  if (doc.documentElement?.tagName === "parsererror") return { status: "fetch-failed" }
 
+  return { status: "ok", doc }
+}
+
+export function evaluateXPathAgainstDocument(doc: Document, xpath: string): ResolvedValue {
+  try {
     const nsResolver = (prefix: string | null) => (prefix ? (XPATH_NAMESPACES[prefix] ?? null) : null)
     const result = doc.evaluate(xpath, doc, nsResolver, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null)
 
@@ -117,4 +127,16 @@ export async function resolveCitedValue(
     // "uncitable" from this function's own contract.
     return { status: "uncitable" }
   }
+}
+
+export async function resolveCitedValue(
+  graph: ShapeGraph,
+  propertyShapeIri: string,
+  resolveSourceUri: (fileUri: string) => string,
+): Promise<ResolvedValue> {
+  const citation = findCitation(graph, propertyShapeIri)
+  if (citation.status !== "found") return { status: citation.status }
+  const fetched = await fetchSourceDocument(citation.sourceUri, resolveSourceUri)
+  if (fetched.status !== "ok") return { status: "fetch-failed" }
+  return evaluateXPathAgainstDocument(fetched.doc, citation.xpath)
 }
