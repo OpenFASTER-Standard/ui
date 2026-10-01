@@ -81,6 +81,45 @@ describe("computeXPathForElement", () => {
     expect(xpath).not.toContain("'")
   })
 
+  // Final-review Critical#1: sibling grouping used a tagName (prefix)
+  // string comparison, not a namespace-aware one -- two different
+  // prefixes bound to the same namespace (legal XML) silently computed a
+  // unique-but-WRONG index. Verified live in real Chromium that the fixed
+  // string below ("[3]") round-trips to the actually-clicked element,
+  // while the old buggy output ("[2]") resolved to a different one.
+  // jsdom's own XPath evaluator is not namespace-aware (verified live: it
+  // matches "xs:element[N]" by literal qualified-name string, so it
+  // cannot distinguish xs:element from xs2:element at all) -- round-
+  // tripping this specific case through assertRoundTrips would fail under
+  // jsdom even for the *correct* output, so this asserts on the computed
+  // string directly; real-browser correctness was verified separately.
+  it("disambiguates siblings by namespace URI and local name, not by qualified-name prefix (C1)", () => {
+    const doc = parse(`<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xs2="http://www.w3.org/2001/XMLSchema">
+  <xs:element>ONE</xs:element>
+  <xs2:element>TWO</xs2:element>
+  <xs:element>THREE</xs:element>
+</xs:schema>`)
+    const third = doc.getElementsByTagNameNS("http://www.w3.org/2001/XMLSchema", "element")[2]
+    expect(third.textContent).toBe("THREE")
+    expect(computeXPathForElement(third)).toBe("/xs:schema/xs:element[3]")
+  })
+
+  // Final-review Minor#1: a present-but-empty name attribute passed the
+  // old "nameAttr !== null" check and, when it happened to be unique
+  // among siblings, got embedded as `[@name='']` -- a working but
+  // confusing disambiguator for a value that isn't really a name at all.
+  it("treats an empty-string name attribute as absent, not as a disambiguator (M1)", () => {
+    const doc = parse(`<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name=""/>
+  <xs:element name="Foo"/>
+</xs:schema>`)
+    const target = doc.getElementsByTagName("xs:element")[0]
+    const xpath = assertRoundTrips(doc, target)
+    expect(xpath).toBe("/xs:schema/xs:element[1]")
+  })
+
   it("round-trips every single element in a busy, realistic fixture, uniquely, to itself", () => {
     const doc = parse(`<?xml version="1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">

@@ -18,8 +18,6 @@ export type Citation =
   | { status: "unsupported-selector-type" }
   | { status: "fetch-failed" }
 
-const XPATH_NAMESPACES: Record<string, string> = { xs: "http://www.w3.org/2001/XMLSchema" }
-
 export const LOADING_TEXT = "Resolving…"
 
 export const RESOLVED_VALUE_STATUS_TEXT: Record<Exclude<ResolvedValue["status"], "resolved">, string> = {
@@ -103,10 +101,21 @@ export async function fetchSourceDocument(
   return { status: "ok", doc }
 }
 
+// Final-review Important#2/#3: a hardcoded map only ever knew about the
+// "xs" prefix, so a document using any other (equally real, equally
+// legal) prefix convention -- e.g. "xsd" -- could never be resolved at
+// all. Every real document already declares its own prefix->namespace
+// bindings via xmlns:*, which Element.lookupNamespaceURI reads directly --
+// deriving the resolver from the document itself generalizes to any
+// convention instead of special-casing one, with zero behavior change for
+// documents that do use "xs" (verified live in real Chromium and jsdom).
+export function documentNamespaceResolver(doc: Document): (prefix: string | null) => string | null {
+  return (prefix) => (prefix ? doc.documentElement.lookupNamespaceURI(prefix) : null)
+}
+
 export function evaluateXPathAgainstDocument(doc: Document, xpath: string): ResolvedValue {
   try {
-    const nsResolver = (prefix: string | null) => (prefix ? (XPATH_NAMESPACES[prefix] ?? null) : null)
-    const result = doc.evaluate(xpath, doc, nsResolver, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null)
+    const result = doc.evaluate(xpath, doc, documentNamespaceResolver(doc), XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null)
 
     if (result.snapshotLength === 0) return { status: "not-found" }
     if (result.snapshotLength > 1) return { status: "ambiguous" }

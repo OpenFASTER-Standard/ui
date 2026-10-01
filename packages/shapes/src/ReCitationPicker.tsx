@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@openfaster-standard/ui"
 import {
   displayTextFor,
@@ -6,11 +6,21 @@ import {
   fetchSourceDocument,
   findCitation,
   LOADING_TEXT,
+  type Citation,
   type ResolvedValue,
 } from "./resolve"
 import { computeXPathForElement } from "./computeXPath"
 import { SourceDocumentTree } from "./SourceDocumentTree"
 import type { ShapeGraph } from "./parse"
+
+// Final-review Important#5: extracted so every one of ResolvedValue's
+// statuses gets a direct, cheap test instead of only the ones reachable
+// through a real document in a component test.
+export function canConfirmCitation(selectedElement: Element | null, preview: ResolvedValue | null): boolean {
+  return selectedElement !== null && preview?.status === "resolved"
+}
+
+type LoadFailureStatus = Exclude<Citation["status"], "found">
 
 export function ReCitationPicker({
   graph,
@@ -24,56 +34,70 @@ export function ReCitationPicker({
   onPendingEdit: (edit: { propertyShapeIri: string; newXPath: string; previewValue: string }) => void
 }) {
   const [doc, setDoc] = useState<Document | null>(null)
-  const [loadFailed, setLoadFailed] = useState(false)
+  // Final-review Important#1: a plain boolean collapsed every non-"found"
+  // citation status and a genuine fetch failure into one generic message --
+  // the real, already-established, more specific text for each was
+  // available and simply discarded.
+  const [loadError, setLoadError] = useState<LoadFailureStatus | null>(null)
   const [selectedElement, setSelectedElement] = useState<Element | null>(null)
+
+  // resolveSourceUri is a pure mapping whose identity carries no real
+  // information -- an inline arrow function (the pattern every real
+  // caller uses) gets a new identity on every parent render, which must
+  // not retrigger a real network fetch. Read the latest version through a
+  // ref instead of depending on it, matching ShapeField/ShapeTable's own
+  // established convention (Minor#2: this used to be an eslint-disable
+  // comment instead).
+  const resolveSourceUriRef = useRef(resolveSourceUri)
+  useEffect(() => {
+    resolveSourceUriRef.current = resolveSourceUri
+  }, [resolveSourceUri])
 
   useEffect(() => {
     let cancelled = false
     setDoc(null)
-    setLoadFailed(false)
+    setLoadError(null)
     setSelectedElement(null)
     const citation = findCitation(graph, propertyShapeIri)
     if (citation.status !== "found") {
-      if (!cancelled) setLoadFailed(true)
+      if (!cancelled) setLoadError(citation.status)
       return
     }
-    fetchSourceDocument(citation.sourceUri, resolveSourceUri).then((fetched) => {
-      if (cancelled) return
-      if (fetched.status !== "ok") {
-        setLoadFailed(true)
-      } else {
-        setDoc(fetched.doc)
-      }
-    })
+    fetchSourceDocument(citation.sourceUri, (u) => resolveSourceUriRef.current(u))
+      .then((fetched) => {
+        if (cancelled) return
+        if (fetched.status !== "ok") setLoadError("fetch-failed")
+        else setDoc(fetched.doc)
+      })
+      .catch(() => {
+        // Minor#3: defense in depth, independent of fetchSourceDocument's
+        // own internal correctness -- a real status the user can see beats
+        // a permanent "Resolving…" no matter what actually went wrong.
+        if (!cancelled) setLoadError("fetch-failed")
+      })
     return () => {
       cancelled = true
     }
-    // resolveSourceUri is excluded deliberately, matching ShapeField/
-    // ShapeTable's own established convention: its identity carries no
-    // real information and must not retrigger a real network fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph, propertyShapeIri])
 
-  if (loadFailed) return <div>{displayTextFor({ status: "fetch-failed" })}</div>
+  if (loadError) return <div>{displayTextFor({ status: loadError })}</div>
   if (!doc) return <div>{LOADING_TEXT}</div>
 
-  const preview: ResolvedValue | null = selectedElement
-    ? evaluateXPathAgainstDocument(doc, computeXPathForElement(selectedElement))
-    : null
+  // Minor#5: computed once and reused for both the preview and the
+  // confirm payload, instead of being recomputed (and risking divergence).
+  const selectedXPath = selectedElement ? computeXPathForElement(selectedElement) : null
+  const preview: ResolvedValue | null = selectedXPath ? evaluateXPathAgainstDocument(doc, selectedXPath) : null
 
   return (
     <div>
-      <SourceDocumentTree root={doc.documentElement} onSelectElement={setSelectedElement} />
-      {preview && <div>{displayTextFor(preview)}</div>}
+      <SourceDocumentTree root={doc.documentElement} selectedElement={selectedElement} onSelectElement={setSelectedElement} />
+      {selectedXPath && <div>{selectedXPath}</div>}
+      {preview && <div aria-label="Citation preview">{displayTextFor(preview)}</div>}
       <Button
-        disabled={!selectedElement || preview?.status !== "resolved"}
+        disabled={!canConfirmCitation(selectedElement, preview)}
         onClick={() => {
-          if (!selectedElement || !preview || preview.status !== "resolved") return
-          onPendingEdit({
-            propertyShapeIri,
-            newXPath: computeXPathForElement(selectedElement),
-            previewValue: preview.value,
-          })
+          if (!selectedXPath || preview?.status !== "resolved") return
+          onPendingEdit({ propertyShapeIri, newXPath: selectedXPath, previewValue: preview.value })
         }}
       >
         Use this citation

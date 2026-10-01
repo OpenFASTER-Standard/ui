@@ -59,6 +59,39 @@ label association and layout. `resolveSourceUri` can safely be a fresh
 inline function on every render -- only its *behavior*, not its identity,
 affects when a field re-resolves.
 
+### Re-citing a value
+
+`ReCitationPicker` lets a maker/checker point a `sh:PropertyShape`'s
+citation at a different span of its already-cited source document --
+re-pointing the citation, never editing a decoded value (this package
+never stores one; see `generator`'s own `annotation_model` for why).
+
+```tsx
+import { ReCitationPicker } from "@openfaster-standard/shapes"
+
+function Example() {
+  return (
+    <ReCitationPicker
+      graph={graph}
+      propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/AOrdNr"
+      resolveSourceUri={resolveSourceUri}
+      onPendingEdit={({ propertyShapeIri, newXPath, previewValue }) => {
+        // Submit the new citation (propertyShapeIri + newXPath) to your
+        // own maker/checker workflow; previewValue is the real resolved
+        // text at newXPath, already confirmed resolvable, for display.
+      }}
+    />
+  )
+}
+```
+
+It renders the current citation's own source document as a clickable
+element tree (`SourceDocumentTree`), computes an XPath for whichever
+element is clicked (`computeXPathForElement`), and only enables
+"Use this citation" once that XPath resolves to exactly one real element --
+`onPendingEdit` never fires for an ambiguous, not-found, or otherwise
+uncitable selection.
+
 ## License
 
 MIT, see `LICENSE`.

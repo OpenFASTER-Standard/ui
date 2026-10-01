@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { parseShapeGraph } from "./parse"
-import { ReCitationPicker } from "./ReCitationPicker"
-import { displayTextFor } from "./resolve"
+import { canConfirmCitation, ReCitationPicker } from "./ReCitationPicker"
+import { displayTextFor, type ResolvedValue } from "./resolve"
 
 const REAL_DOCUMENTATION_TEXT = "Meldung nach § 45c Absatz 2 Satz 3 EStG."
 const REAL_FIXTURE_XML = `<?xml version="1.0"?>
@@ -145,6 +145,112 @@ describe("ReCitationPicker", () => {
     expect(onPendingEdit).not.toHaveBeenCalled()
   })
 
+  // Final-review Important#1: any non-"found" citation status (a
+  // malformed citation, an unsupported selector type) and a genuine fetch
+  // failure were all collapsed into one boolean, always showing the
+  // generic "Couldn't load source" text even when the real, more specific
+  // reason was already known.
+  it("shows the citation's own real text for an unsupported selector type, not a generic fetch-failed message (I1)", async () => {
+    const graph = parseShapeGraph(`
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+<https://openfaster.org/ns/generator#S/Sh/Svg> a sh:PropertyShape ;
+  prov:wasDerivedFrom <https://openfaster.org/ns/generator#S/Sh/Svg/annotation> .
+<https://openfaster.org/ns/generator#S/Sh/Svg/annotation> oa:hasTarget _:target .
+_:target oa:hasSource <file:///whatever.xsd> ;
+  oa:hasSelector _:selector .
+_:selector a oa:SvgSelector ;
+  rdf:value "<svg/>" .
+`)
+
+    render(
+      <ReCitationPicker
+        graph={graph}
+        propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/Svg"
+        resolveSourceUri={(u) => u}
+        onPendingEdit={() => {}}
+      />,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByText(displayTextFor({ status: "unsupported-selector-type" }))).toBeInTheDocument(),
+    )
+  })
+
+  it("shows the citation's own real text for a malformed citation, not a generic fetch-failed message (I1)", async () => {
+    const graph = parseShapeGraph(`
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+<https://openfaster.org/ns/generator#S/Sh/NoValue> a sh:PropertyShape ;
+  prov:wasDerivedFrom <https://openfaster.org/ns/generator#S/Sh/NoValue/annotation> .
+<https://openfaster.org/ns/generator#S/Sh/NoValue/annotation> oa:hasTarget _:target .
+_:target oa:hasSource <file:///whatever.xsd> ;
+  oa:hasSelector _:selector .
+_:selector a oa:XPathSelector .
+`)
+
+    render(
+      <ReCitationPicker
+        graph={graph}
+        propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/NoValue"
+        resolveSourceUri={(u) => u}
+        onPendingEdit={() => {}}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByText(displayTextFor({ status: "malformed-citation" }))).toBeInTheDocument())
+  })
+
+  // Final-review Important#4: only the resolved preview *value* was ever
+  // shown -- there was no way to see what XPath a click actually computed,
+  // nor which tree node was currently selected.
+  it("displays the computed XPath for the current selection (I4)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(REAL_FIXTURE_XML) }))
+    const graph = parseShapeGraph(CITED_SHAPE)
+
+    render(
+      <ReCitationPicker
+        graph={graph}
+        propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/AOrdNr"
+        resolveSourceUri={(u) => u}
+        onPendingEdit={() => {}}
+      />,
+    )
+
+    await waitFor(() => screen.getByText(new RegExp(REAL_DOCUMENTATION_TEXT)))
+    screen.getByText(new RegExp(REAL_DOCUMENTATION_TEXT)).click()
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("/xs:schema/xs:complexType[@name='Meldeart23']/xs:annotation/xs:documentation"),
+      ).toBeInTheDocument(),
+    )
+  })
+
+  it("marks the selected tree node visibly via aria-pressed (I4)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(REAL_FIXTURE_XML) }))
+    const graph = parseShapeGraph(CITED_SHAPE)
+
+    render(
+      <ReCitationPicker
+        graph={graph}
+        propertyShapeIri="https://openfaster.org/ns/generator#S/Sh/AOrdNr"
+        resolveSourceUri={(u) => u}
+        onPendingEdit={() => {}}
+      />,
+    )
+
+    await waitFor(() => screen.getByText(new RegExp(REAL_DOCUMENTATION_TEXT)))
+    const node = screen.getByText(new RegExp(REAL_DOCUMENTATION_TEXT))
+    expect(node).toHaveAttribute("aria-pressed", "false")
+    node.click()
+
+    await waitFor(() => expect(node).toHaveAttribute("aria-pressed", "true"))
+  })
+
   it("replaces the preview when a different node is clicked after an earlier selection, not leaving stale text visible", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(REAL_FIXTURE_XML) }))
     const graph = parseShapeGraph(CITED_SHAPE)
@@ -165,5 +271,37 @@ describe("ReCitationPicker", () => {
     screen.getByText(/xs:element \[AOrdNr\]/).click()
 
     await waitFor(() => expect(screen.queryByText(REAL_DOCUMENTATION_TEXT)).not.toBeInTheDocument())
+  })
+})
+
+// Final-review Important#5: confirm-gating logic was only ever exercised
+// indirectly, through the DOM, for a handful of statuses -- extracted here
+// so every one of ResolvedValue's seven statuses gets a direct, cheap
+// assertion without needing a pathological document for each.
+describe("canConfirmCitation", () => {
+  const nonResolved: Exclude<ResolvedValue["status"], "resolved">[] = [
+    "not-found",
+    "ambiguous",
+    "uncitable",
+    "fetch-failed",
+    "malformed-citation",
+    "unsupported-selector-type",
+  ]
+
+  it("is true for a selected element with a resolved preview", () => {
+    const preview: ResolvedValue = { status: "resolved", value: "x" }
+    expect(canConfirmCitation(document.createElement("xs:element"), preview)).toBe(true)
+  })
+
+  it.each(nonResolved)("is false for a selected element with a %s preview", (status) => {
+    expect(canConfirmCitation(document.createElement("xs:element"), { status })).toBe(false)
+  })
+
+  it("is false when nothing is selected, even with a resolved preview", () => {
+    expect(canConfirmCitation(null, { status: "resolved", value: "x" })).toBe(false)
+  })
+
+  it("is false when nothing is selected and there is no preview at all", () => {
+    expect(canConfirmCitation(null, null)).toBe(false)
   })
 })

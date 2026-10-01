@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { parseShapeGraph } from "./parse"
-import { displayTextFor, evaluateXPathAgainstDocument, fetchSourceDocument, findCitation, resolveCitedValue } from "./resolve"
+import {
+  displayTextFor,
+  documentNamespaceResolver,
+  evaluateXPathAgainstDocument,
+  fetchSourceDocument,
+  findCitation,
+  resolveCitedValue,
+} from "./resolve"
 
 const REAL_DOCUMENTATION_TEXT = "Meldung nach § 45c Absatz 2 Satz 3 EStG."
 
@@ -372,6 +379,39 @@ describe("evaluateXPathAgainstDocument", () => {
   it("returns uncitable for a syntactically invalid XPath, not a crash", () => {
     const doc = new DOMParser().parseFromString(REAL_FIXTURE_XML, "text/xml")
     expect(evaluateXPathAgainstDocument(doc, "/xs:schema[[[not valid")).toEqual({ status: "uncitable" })
+  })
+
+})
+
+// Final-review Important#2/#3: the namespace resolver passed to
+// doc.evaluate() was a hardcoded single-entry map ({ xs: "..." }), so any
+// document using a different (equally real, equally legal) prefix
+// convention was completely unresolvable -- verified live in real
+// Chromium. jsdom's own XPath implementation turned out to ignore the
+// resolver function's return value entirely for node-matching purposes
+// (verified live: a resolver that returns null for every prefix, or the
+// wrong namespace URI altogether, still produced a correct match) -- so
+// no round-trip test through evaluateXPathAgainstDocument/doc.evaluate
+// can distinguish the old hardcoded map from the new document-derived
+// one under jsdom. This tests the resolver-construction logic directly
+// instead, which does not depend on jsdom's own XPath matching at all.
+describe("documentNamespaceResolver", () => {
+  it("resolves an arbitrary namespace prefix from the document's own declarations, not a hardcoded map", () => {
+    const doc = new DOMParser().parseFromString(
+      `<?xml version="1.0"?><xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>`,
+      "text/xml",
+    )
+    expect(documentNamespaceResolver(doc)("xsd")).toBe("http://www.w3.org/2001/XMLSchema")
+  })
+
+  it("still resolves the xs: convention used throughout the real corpus, unaffected", () => {
+    const doc = new DOMParser().parseFromString(REAL_FIXTURE_XML, "text/xml")
+    expect(documentNamespaceResolver(doc)("xs")).toBe("http://www.w3.org/2001/XMLSchema")
+  })
+
+  it("returns null for a null prefix, matching the DOM XPathNSResolver contract", () => {
+    const doc = new DOMParser().parseFromString(REAL_FIXTURE_XML, "text/xml")
+    expect(documentNamespaceResolver(doc)(null)).toBeNull()
   })
 })
 
